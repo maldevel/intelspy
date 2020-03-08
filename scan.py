@@ -44,22 +44,65 @@ ProjectDir = ''
 LiveHostsDir = ''
 LogsDir = ''
 LogsFile = ''
+ReportDir = ''
+LiveHostsListFile = ''
+
+#####################################################################################################################
+class grep:
+
+	@classmethod
+	def liveHosts(self, target):
+		global LiveHostsDir, LiveHostsListFile, LogsFile
+		
+		try:
+
+			gnmapFilesDir = os.path.join(LiveHostsDir, '*.gnmap')
+
+			command = "cat {0} | grep 'Status: Up' | cut -d ' ' -f2 | sort -V | uniq | tee {1}".format(gnmapFilesDir, LiveHostsListFile)
+			
+			log.info('Live hosts of target {0}.'.format(target))
+			log.info('Command: {0}'.format(command))
+			log.info('Output:')
+			log.info('********************************* START *********************************')
+			subprocess.run(command, shell=True)
+
+		except:
+			e = sys.exc_info()[0]
+			log.error("An error occured during nmap scan results grep: {0}.".format(e))
+
+
+		try:
+			cmdOutput = ''
+			with open(LiveHostsListFile, 'r') as file:
+				cmdOutput = file.read()
+
+			with open(LogsFile, 'a') as file:
+				file.write(cmdOutput)
+
+		except:
+			e = sys.exc_info()[0]
+			log.error("An error occured while trying to append grep result to log file '{0}': {1}.".format(LogsFile, e))
+
+		log.info('********************************* END *********************************')
 
 
 #####################################################################################################################
 class fm:
 
 	@classmethod
-	def createProjectDirStructure(self, projName, workingDir):
-		global ProjectDir, LiveHostsDir, LogsDir, LogsFile
+	def createProjectDirStructure(self, target, projName, workingDir):
+		global ProjectDir, LiveHostsDir, LogsDir, LogsFile, ReportDir, LiveHostsListFile
 
 		ProjectDir = os.path.join(workingDir, projName)
-		LiveHostsDir = os.path.join(ProjectDir, 'live-hosts', datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
-		LogsDir = os.path.join(ProjectDir, 'logs')
-		LogsFile = os.path.join(LogsDir, "log-{0}.txt".format(datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+		LiveHostsDir = os.path.join(ProjectDir, 'live-hosts', target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+		LogsDir = os.path.join(ProjectDir, 'logs', target.replace('/', '_'))
+		LogsFile = os.path.join(LogsDir, "{0}-log-{1}-{2}.txt".format(projName, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+		ReportDir = os.path.join(ProjectDir, 'report', target.replace('/', '_'))
+		LiveHostsListFile = os.path.join(ReportDir, "{0}-live-hosts-list-{1}-{2}.txt".format(projName, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 
 		Path(LiveHostsDir).mkdir(parents=True, exist_ok=True)
 		Path(LogsDir).mkdir(parents=True, exist_ok=True)
+		Path(ReportDir).mkdir(parents=True, exist_ok=True)
 
 		log.info("Creating project directory structure '{0}'.".format(ProjectDir))		
 
@@ -84,6 +127,7 @@ class log:
 
 	@classmethod
 	def write(self, logType, logStr):
+		global LogsFile
 		eventID = str(log.nextEventID())
 
 		print("[{0} {1}] {2}".format(datetime.now().strftime("%d/%b/%Y:%H:%M:%S"), 
@@ -119,37 +163,39 @@ class user:
 class scanner:
 
 	@classmethod
-	def livehosts(self, target):
+	def livehosts(self, projName, target):
+		global LiveHostsDir
 
 		log.info('Scanning target {0} for live hosts.'.format(target))
-		scanner.liveHostsIcmpEcho(LiveHostsDir, target)
 
-		scanner.liveHostsTcpAck(LiveHostsDir, target)
+		scanner.liveHostsIcmpEcho(projName, LiveHostsDir, target)
 
-		scanner.liveHostsTcpSyn(LiveHostsDir, target)
+		scanner.liveHostsTcpAck(projName, LiveHostsDir, target)
 
-		scanner.liveHostsSctp(LiveHostsDir, target)
+		scanner.liveHostsTcpSyn(projName, LiveHostsDir, target)
 
-		scanner.liveHostsUdp(LiveHostsDir, target)
+		scanner.liveHostsSctp(projName, LiveHostsDir, target)
 
-		scanner.liveHostsProtocolPing(LiveHostsDir, target)
+		scanner.liveHostsUdp(projName, LiveHostsDir, target)
 
-		scanner.liveHostsTimestamp(LiveHostsDir, target)
+		scanner.liveHostsProtocolPing(projName, LiveHostsDir, target)
 
-		scanner.liveHostsNetmask(LiveHostsDir, target)
+		scanner.liveHostsTimestamp(projName, LiveHostsDir, target)
 
-		scanner.liveHostsTopTcp100(LiveHostsDir, target)
+		scanner.liveHostsNetmask(projName, LiveHostsDir, target)
+
+		scanner.liveHostsTopTcp100(projName, LiveHostsDir, target)
 
 		log.info('Scanning target {0} for live hosts completed.'.format(target))
 
 
 	@classmethod
-	def liveHostsIcmpEcho(self, outputDir, target):
+	def liveHostsIcmpEcho(self, projName, outputDir, target):
 
 		prefix = 'live-hosts-icmp-echo-scan'
 
-		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+		nmapLogFilePrefix = "{0}-{1}-{2}-{3}".format(projName, prefix, args.target.replace('/', '_'), 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
 		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
 
@@ -158,12 +204,12 @@ class scanner:
 		scanner.scan('ICMP echo', outputDir, command, target)
 
 	@classmethod
-	def liveHostsTcpAck(self, outputDir, target):
+	def liveHostsTcpAck(self, projName, outputDir, target):
 
 		prefix = 'live-hosts-tcp-ack-scan'
 
-		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+		nmapLogFilePrefix = "{0}-{1}-{2}-{3}".format(projName, prefix, args.target.replace('/', '_'), 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
 		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
 
@@ -172,12 +218,12 @@ class scanner:
 		scanner.scan('TCP ACK', outputDir, command, target)
 
 	@classmethod
-	def liveHostsTcpSyn(self, outputDir, target):
+	def liveHostsTcpSyn(self, projName, outputDir, target):
 
 		prefix = 'live-hosts-tcp-syn-scan'
 
-		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+		nmapLogFilePrefix = "{0}-{1}-{2}-{3}".format(projName, prefix, args.target.replace('/', '_'), 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
 		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
 
@@ -187,12 +233,12 @@ class scanner:
 
 
 	@classmethod
-	def liveHostsSctp(self, outputDir, target):
+	def liveHostsSctp(self, projName, outputDir, target):
 
 		prefix = 'live-hosts-sctp-scan'
 
-		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+		nmapLogFilePrefix = "{0}-{1}-{2}-{3}".format(projName, prefix, args.target.replace('/', '_'), 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
 		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
 
@@ -201,12 +247,12 @@ class scanner:
 		scanner.scan('SCTP', outputDir, command, target)
 
 	@classmethod
-	def liveHostsUdp(self, outputDir, target):
+	def liveHostsUdp(self, projName, outputDir, target):
 
 		prefix = 'live-hosts-udp-scan'
 
-		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+		nmapLogFilePrefix = "{0}-{1}-{2}-{3}".format(projName, prefix, args.target.replace('/', '_'), 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
 		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
 
@@ -215,12 +261,12 @@ class scanner:
 		scanner.scan('UDP', outputDir, command, target)
 
 	@classmethod
-	def liveHostsProtocolPing(self, outputDir, target):
+	def liveHostsProtocolPing(self, projName, outputDir, target):
 
 		prefix = 'live-hosts-protocol-ping-scan'
 
-		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+		nmapLogFilePrefix = "{0}-{1}-{2}-{3}".format(projName, prefix, args.target.replace('/', '_'), 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
 		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
 
@@ -229,12 +275,12 @@ class scanner:
 		scanner.scan('Protocol Ping', outputDir, command, target)
 
 	@classmethod
-	def liveHostsTimestamp(self, outputDir, target):
+	def liveHostsTimestamp(self, projName, outputDir, target):
 
 		prefix = 'live-hosts-timestamp-scan'
 
-		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+		nmapLogFilePrefix = "{0}-{1}-{2}-{3}".format(projName, prefix, args.target.replace('/', '_'),  
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
 		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
 
@@ -243,12 +289,12 @@ class scanner:
 		scanner.scan('Timestamp', outputDir, command, target)
 
 	@classmethod
-	def liveHostsNetmask(self, outputDir, target):
+	def liveHostsNetmask(self, projName, outputDir, target):
 
 		prefix = 'live-hosts-netmask-scan'
 
-		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+		nmapLogFilePrefix = "{0}-{1}-{2}-{3}".format(projName, prefix, args.target.replace('/', '_'), 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
 		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
 
@@ -257,12 +303,12 @@ class scanner:
 		scanner.scan('Netmask', outputDir, command, target)
 
 	@classmethod
-	def liveHostsTopTcp100(self, outputDir, target):
+	def liveHostsTopTcp100(self, projName, outputDir, target):
 
 		prefix = 'live-hosts-top-tcp-100-scan'
 
-		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+		nmapLogFilePrefix = "{0}-{1}-{2}-{3}".format(projName, prefix, args.target.replace('/', '_'), 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
 		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
 
@@ -273,6 +319,7 @@ class scanner:
 
 	@classmethod
 	def scan(self, type, nmapLogFilePrefix, command, target):
+		global LogsFile
 
 		log.info('Target: {0} Scan Type: {1}'.format(args.target, type))
 		log.info('Command: {0}'.format(command))
@@ -305,13 +352,14 @@ class scanner:
 #####################################################################################################################
 def main(args,extra):
 
-	fm.createProjectDirStructure(args.project_name, args.working_dir)
+	fm.createProjectDirStructure(args.target, args.project_name, args.working_dir)
 
 	if not user.isRoot():
 		exit(1)
 
-	scanner.livehosts(args.target)
+	scanner.livehosts(args.project_name, args.target)
 
+	grep.liveHosts(args.target)
 
 
 #####################################################################################################################
