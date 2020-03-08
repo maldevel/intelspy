@@ -1,12 +1,8 @@
-# AutoScan
+# IntelSpy
 
-Perform automated network reconnaissance scans.
+Perform automated network reconnaissance scans to gather network intelligence.
 
-AutoScan is a network reconnaissance tool which performs automated enumeration of network services.
-
-AutoScan performs live hosts detection scans, port scans and services enumeration and detection scans. 
-
-The tool will also launch further enumeration scans of those services using a number of different tools.
+AutoScan is a network intel spy tool which performs automated enumeration of network services. It performs live hosts detection scans, port scans, services enumeration scans, web content scans, brute-force, detailed off-line exploits searches and more. The tool will also launch further enumeration scans for each detected service using a number of different tools.
 
 ---
 
@@ -23,6 +19,7 @@ The tool will also launch further enumeration scans of those services using a nu
 
 * Python 3
 * colorama
+* nmap
 
 ```
 pip3 install -r requirements.txt
