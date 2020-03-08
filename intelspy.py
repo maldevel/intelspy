@@ -43,6 +43,8 @@ from pathlib import Path
 import colorama
 from colorama import Fore, Style
 import time
+import ipaddress
+
 
 
 #####################################################################################################################
@@ -55,6 +57,10 @@ LogsDir = ''
 LogsFile = ''
 ReportDir = ''
 LiveHostsListFile = ''
+InternalPTMode = False
+LiveHostsList = []
+LiveHostsMDFile = ''
+
 
 
 #####################################################################################################################
@@ -73,6 +79,30 @@ https://github.com/maldevel/intelspy
 """.format(__version__)
 
 
+
+#####################################################################################################################
+class md:
+	@classmethod
+	def genLiveHosts(self, live_hosts):
+		data = "## Live Hosts\n\n"
+		for val in live_hosts:
+			if val != "":
+				data += "* " + val + "\n"
+		data += "\n---\n"
+		return data
+
+
+
+#####################################################################################################################
+class pt:
+	@classmethod
+	def setMode(self, target):
+		ipv4 = ipaddress.IPv4Network(target)
+		InternalPTMode = ipv4.is_private
+		return InternalPTMode
+
+
+
 #####################################################################################################################
 class exec:
 	@classmethod
@@ -81,10 +111,25 @@ class exec:
 		subprocess.run(command, shell=shell)
 		print(Style.NORMAL + Fore.RESET)
 
+	@classmethod
+	def pipe(self, command):
+		print(Fore.MAGENTA + Style.BRIGHT)
+		p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		out, err = p.communicate()
+		print(out)
+		print(Style.NORMAL + Fore.RESET)
+		return out
+
 
 
 #####################################################################################################################
 class help:
+
+	@classmethod
+	def writeMD(self, data, filePath):
+		with open(filePath, 'w') as file:
+				file.write(data)
+
 	@classmethod
 	def elapsedTime(self, start):
 	    sec = round(time.time() - start)
@@ -117,8 +162,10 @@ class grep:
 
 	@classmethod
 	def liveHosts(self, target):
-		global LiveHostsDir, LiveHostsListFile, LogsFile
+		global LiveHostsDir, LiveHostsListFile, LogsFile, LiveHostsMDFile
 		
+		cmdOutput = ''
+
 		try:
 
 			gnmapFilesDir = os.path.join(LiveHostsDir, '*.gnmap')
@@ -136,7 +183,6 @@ class grep:
 			log.error("An error occured during nmap scan results grep: {0}.".format(e))
 
 		try:
-			cmdOutput = ''
 			with open(LiveHostsListFile, 'r') as file:
 				cmdOutput = file.read()
 
@@ -151,6 +197,11 @@ class grep:
 		message = Fore.CYAN + "Task completed in {0}.".format(help.elapsedTime(start)) + Fore.RESET
 		log.info(message)
 
+		LiveHostsList = cmdOutput.split('\n')
+		help.writeMD(md.genLiveHosts(LiveHostsList), LiveHostsMDFile)
+
+		return cmdOutput
+
 
 
 #####################################################################################################################
@@ -158,7 +209,7 @@ class fm:
 
 	@classmethod
 	def createProjectDirStructure(self, target, projName, workingDir):
-		global ProjectDir, LiveHostsDir, LogsDir, LogsFile, ReportDir, LiveHostsListFile
+		global ProjectDir, LiveHostsDir, LogsDir, LogsFile, ReportDir, LiveHostsListFile, LiveHostsMDFile
 
 		ProjectDir = os.path.join(workingDir, projName)
 		ScansDir = os.path.join(ProjectDir, 'scans')
@@ -170,6 +221,7 @@ class fm:
 		
 		ReportDir = os.path.join(ProjectDir, 'report', target.replace('/', '_'))
 		LiveHostsListFile = os.path.join(ReportDir, "{0}-live-hosts-list-{1}-{2}.txt".format(projName, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+		LiveHostsMDFile = LiveHostsListFile.replace('.txt', '.md')
 
 		Path(LiveHostsDir).mkdir(parents=True, exist_ok=True)
 		Path(LogsDir).mkdir(parents=True, exist_ok=True)
@@ -276,6 +328,7 @@ class scanner:
 
 		return os.path.join(outputDir, nmapLogFilePrefix)
 
+
 	@classmethod
 	def liveHostsIcmpEcho(self, projName, outputDir, target):
 
@@ -283,12 +336,14 @@ class scanner:
 		command = "nmap -vv -n -sn -PE -oA {0} {1}".format(outputDir, args.target)
 		scanner.scan('ICMP echo', outputDir, command, target)
 
+
 	@classmethod
 	def liveHostsTcpAck(self, projName, outputDir, target):
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-tcp-ack-scan', outputDir)
 		command = "nmap -vv -n -sn -PA21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} {1}".format(outputDir, args.target)
 		scanner.scan('TCP ACK', outputDir, command, target)
+
 
 	@classmethod
 	def liveHostsTcpSyn(self, projName, outputDir, target):
@@ -305,12 +360,14 @@ class scanner:
 		command = "nmap -vv -n -sn -PY132,2905 -oA {0} {1}".format(outputDir, args.target)
 		scanner.scan('SCTP', outputDir, command, target)
 
+
 	@classmethod
 	def liveHostsUdp(self, projName, outputDir, target):
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-udp-scan', outputDir)
 		command = "nmap -vv -n -sn -PU53,67,68,69,123,135,137,138,139,161,162,445,500,514,520,631,1434,1600,4500,49152 -oA {0} {1}".format(outputDir, args.target)
 		scanner.scan('UDP', outputDir, command, target)
+
 
 	@classmethod
 	def liveHostsProtocolPing(self, projName, outputDir, target):
@@ -319,6 +376,7 @@ class scanner:
 		command = "nmap -vv -n -sn -PO -oA {0} {1}".format(outputDir, args.target)
 		scanner.scan('Protocol Ping', outputDir, command, target)
 
+
 	@classmethod
 	def liveHostsTimestamp(self, projName, outputDir, target):
 
@@ -326,12 +384,14 @@ class scanner:
 		command = "nmap -vv -n -sn -PP -oA {0} {1}".format(outputDir, args.target)
 		scanner.scan('Timestamp', outputDir, command, target)
 
+
 	@classmethod
 	def liveHostsNetmask(self, projName, outputDir, target):
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-netmask-scan', outputDir)
 		command = "nmap -vv -n -sn -PM -oA {0} {1}".format(outputDir, args.target)
 		scanner.scan('Netmask', outputDir, command, target)
+
 
 	@classmethod
 	def liveHostsTopTcp100(self, projName, outputDir, target):
@@ -344,6 +404,8 @@ class scanner:
 	@classmethod
 	def scan(self, type, nmapLogFilePrefix, command, target):
 		global LogsFile
+
+		nmapOutput = ''
 
 		log.info('Scan Type: {1}'.format(args.target, type))
 		log.debug('Command: {0}'.format(command))
@@ -359,12 +421,13 @@ class scanner:
 			log.error("An error occured during nmap scan ({0}): {1}.".format(type, e))
 
 		try:
-			nmapOutput = ''
+			
 			with open(nmapLogFilePrefix + ".nmap", 'r') as file:
 				nmapOutput = file.read()
 
 			with open(LogsFile, 'a') as file:
 				file.write(nmapOutput)
+
 		except:
 			e = sys.exc_info()[0]
 			log.error("An error occured while trying to append nmap scan output to log file '{0}': {1}.".format(LogsFile, e))
@@ -373,18 +436,28 @@ class scanner:
 		message = Fore.CYAN + "Task completed in {0}.".format(help.elapsedTime(start)) + Fore.RESET
 		log.info(message)
 
+		return nmapOutput
+
 
 
 #####################################################################################################################
 def main(args,extra):
+	global LiveHostsList
 
 	fm.createProjectDirStructure(args.target, args.project_name, args.working_dir)
 
 	if not user.isRoot():
 		exit(1)
 
+	if pt.setMode(args.target) == True:
+		log.info('Penetration Test Type: Internal.')
+	else:
+		log.info('Penetration Test Type: External.')
+
 	scanner.livehosts(args.project_name, args.target)
+
 	grep.liveHosts(args.target)
+
 
 
 #####################################################################################################################
