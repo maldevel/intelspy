@@ -44,6 +44,7 @@ from colorama import Fore, Style
 import time
 
 
+#####################################################################################################################
 __version__ = 1.0
 
 EventID = 0
@@ -55,6 +56,7 @@ ReportDir = ''
 LiveHostsListFile = ''
 
 
+#####################################################################################################################
 message = """
                   __            
   /\     _|_  _  (_   _  _. ._  
@@ -79,6 +81,8 @@ class exec:
 		print(Style.NORMAL + Fore.RESET)
 
 
+
+#####################################################################################################################
 class help:
 	@classmethod
 	def elapsedTime(self, start):
@@ -126,11 +130,9 @@ class grep:
 			start = time.time()
 			exec.run(command, True)
 
-
 		except:
 			e = sys.exc_info()[0]
 			log.error("An error occured during nmap scan results grep: {0}.".format(e))
-
 
 		try:
 			cmdOutput = ''
@@ -349,7 +351,6 @@ class scanner:
 		start = time.time()
 
 		try:
-
 			exec.run(shlex.split(command), False)
 
 		except:
@@ -382,7 +383,6 @@ def main(args,extra):
 		exit(1)
 
 	scanner.livehosts(args.project_name, args.target)
-
 	grep.liveHosts(args.target)
 
 
@@ -392,7 +392,6 @@ if __name__ == '__main__':
 	print(message)
 
 	parser = argparse.ArgumentParser()
-
 	parser.add_argument('-t', '--target', help='target IP or IP range', required=True)
 	parser.add_argument('-st', '--scan-type', help='network scan type (internal or external)', required=True)
 	parser.add_argument('-p', '--project-name', help='project name', required=True)
