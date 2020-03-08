@@ -1,14 +1,13 @@
-# IntelSpy
-
 ![Alt text](logo.png?raw=true "Title")
 
+## IntelSpy
 Perform automated network reconnaissance scans to gather network intelligence.
 
 IntelSpy is a network intelligence spy tool which performs automated enumeration of network services. It performs live hosts detection scans, port scans, services enumeration scans, web content scans, brute-force, detailed off-line exploits searches and more. The tool will also launch further enumeration scans for each detected service using a number of different tools.
 
 ---
 
-## Features
+### Features
 
 * Scans IP addresses and IP ranges (CIDR notation).
 * Creates a directory structure for results gathering.
@@ -18,7 +17,7 @@ IntelSpy is a network intelligence spy tool which performs automated enumeration
 
 ---
 
-## Requirements
+### Requirements
 
 * Python 3
 * colorama
@@ -30,7 +29,7 @@ pip3 install -r requirements.txt
 
 ---
 
-## Usage
+### Usage
 
 ```
 usage: scan.py [-h] -t TARGET -st SCAN_TYPE -p PROJECT_NAME -w WORKING_DIR
@@ -47,7 +46,7 @@ optional arguments:
 
 ---
 
-## Usage Examples
+### Usage Examples
 
 ```
 sudo python3 intelspy.py -t 192.168.10.0/24 -p MyProjectName -w /home/user/pt/projects/
