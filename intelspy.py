@@ -1,10 +1,11 @@
 #!/usr/bin/python3
 
-#    This file is part of AutoScan
+#    This file is part of IntelSpy
 #    Copyright (C) 2020 @maldevel
-#    https://github.com/maldevel/autoscan
+#    https://github.com/maldevel/intelspy
 #
-#    AutoScan - Perform automated network reconnaissance scans.
+#    IntelSpy - Perform automated network reconnaissance scans.
+#	 Gather network intelligence.
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -58,16 +59,16 @@ LiveHostsListFile = ''
 
 #####################################################################################################################
 message = """
-                  __            
-  /\     _|_  _  (_   _  _. ._  
- /--\ |_| |_ (_) __) (_ (_| | | 
+ ___               __        
+  |  ._ _|_  _  | (_  ._     
+ _|_ | | |_ (/_ | __) |_) \/ 
+                      |   /  
                                 
-
-AutoScan v. {} - Perform automated network reconnaissance scans of network services.
-AutoScan is an open source tool licensed under GPLv3.
+IntelSpy v{} - Perform automated network reconnaissance scans to gather network intelligence.
+IntelSpy is an open source tool licensed under GPLv3.
 Written by: @maldevel | Logisek
 https://pentest-labs.com/
-https://github.com/maldevel/autoscan
+https://github.com/maldevel/intelspy
 
 """.format(__version__)
 
@@ -393,7 +394,6 @@ if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-t', '--target', help='target IP or IP range', required=True)
-	parser.add_argument('-st', '--scan-type', help='network scan type (internal or external)', required=True)
 	parser.add_argument('-p', '--project-name', help='project name', required=True)
 	parser.add_argument('-w', '--working-dir', help='working directory', required=True)
 

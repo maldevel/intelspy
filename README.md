@@ -12,6 +12,7 @@ IntelSpy is a network intelligence spy tool which performs automated enumeration
 * Creates a directory structure for results gathering.
 * Logs commands that were run.
 * Extracts important information in txt and markdown format.
+* Stores data to an SQLite database.
 
 ---
 
@@ -36,8 +37,6 @@ optional arguments:
   -h, --help            show this help message and exit
   -t TARGET, --target TARGET
                         target IP or IP range
-  -st SCAN_TYPE, --scan-type SCAN_TYPE
-                        network scan type (internal or external)
   -p PROJECT_NAME, --project-name PROJECT_NAME
                         project name
   -w WORKING_DIR, --working-dir WORKING_DIR
@@ -49,7 +48,7 @@ optional arguments:
 ## Usage Examples
 
 ```
-sudo python3 scan.py -t 192.168.10.0/24 -st external -p MyProjectName -w /home/user/pt/projects/
+sudo python3 intelspy.py -t 192.168.10.0/24 -p MyProjectName -w /home/user/pt/projects/
 ```
 
 ---
