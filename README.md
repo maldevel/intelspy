@@ -2,7 +2,7 @@
 
 Perform automated network reconnaissance scans to gather network intelligence.
 
-AutoScan is a network intel spy tool which performs automated enumeration of network services. It performs live hosts detection scans, port scans, services enumeration scans, web content scans, brute-force, detailed off-line exploits searches and more. The tool will also launch further enumeration scans for each detected service using a number of different tools.
+IntelSpy is a network intelligence spy tool which performs automated enumeration of network services. It performs live hosts detection scans, port scans, services enumeration scans, web content scans, brute-force, detailed off-line exploits searches and more. The tool will also launch further enumeration scans for each detected service using a number of different tools.
 
 ---
 
