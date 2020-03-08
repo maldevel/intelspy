@@ -31,7 +31,7 @@ pip3 install -r requirements.txt
 ### Usage
 
 ```
-usage: scan.py [-h] -t TARGET -st SCAN_TYPE -p PROJECT_NAME -w WORKING_DIR
+usage: scan.py [-h] -t TARGET -p PROJECT_NAME -w WORKING_DIR
 
 optional arguments:
   -h, --help            show this help message and exit
