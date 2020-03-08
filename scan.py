@@ -37,8 +37,32 @@ from datetime import timezone
 import socket
 import sys
 import shlex
+from pathlib import Path
 
 EventID = 0
+ProjectDir = ''
+LiveHostsDir = ''
+LogsDir = ''
+LogsFile = ''
+
+
+#####################################################################################################################
+class fm:
+
+	@classmethod
+	def createProjectDirStructure(self, projName, workingDir):
+		global ProjectDir, LiveHostsDir, LogsDir, LogsFile
+
+		ProjectDir = os.path.join(workingDir, projName)
+		LiveHostsDir = os.path.join(ProjectDir, 'live-hosts', datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+		LogsDir = os.path.join(ProjectDir, 'logs')
+		LogsFile = os.path.join(LogsDir, "log-{0}.txt".format(datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+
+		Path(LiveHostsDir).mkdir(parents=True, exist_ok=True)
+		Path(LogsDir).mkdir(parents=True, exist_ok=True)
+
+		log.info("Creating project directory structure '{0}'.".format(ProjectDir))		
+
 
 
 #####################################################################################################################
@@ -51,28 +75,28 @@ class log:
 		return EventID
 
 	@classmethod
-	def info(self, logfile, logStr):
-		log.write(logfile, 'Info', logStr)
+	def info(self, logStr):
+		log.write('Info', logStr)
 
 	@classmethod
-	def error(self, logfile, logStr):
-		log.write(logfile, 'Error', logStr)
+	def error(self, logStr):
+		log.write('Error', logStr)
 
 	@classmethod
-	def write(self, logfile, logType, logStr):
+	def write(self, logType, logStr):
 		eventID = str(log.nextEventID())
 
 		print("[{0} {1}] {2}".format(datetime.now().strftime("%d/%b/%Y:%H:%M:%S"), 
 			datetime.now(timezone.utc).astimezone().strftime('%z'), logStr))
 
 		try:
-			with open(logfile, "a") as logFile:
+			with open(LogsFile, "a") as logFile:
 				logFile.write("[{0} {1}] {2} EventID={3} Type={4} Log=\"{5}\"\n".format(datetime.now().strftime("%d/%b/%Y:%H:%M:%S"), 
 					datetime.now(timezone.utc).astimezone().strftime('%z'), socket.gethostname(), eventID, logType, logStr))
 		except:
 			e = sys.exc_info()[0]
 			print("[{0} {1}] {2} '{3}': {4}\n".format(datetime.now().strftime("%d/%b/%Y:%H:%M:%S"), 
-				datetime.now(timezone.utc).astimezone().strftime('%z'), "There is a problem writing to the log file", logfile, e))
+				datetime.now(timezone.utc).astimezone().strftime('%z'), "There is a problem writing to the log file", LogsFile, e))
 			sys.exit()
 
 		return
@@ -83,9 +107,9 @@ class log:
 class user:
 
 	@classmethod
-	def isRoot(self, logfile):
+	def isRoot(self):
 		if os.geteuid() != 0:
-			log.error(logfile, "You need root permissions.")
+			log.error("You need root permissions.")
 			return False
 		return True
 
@@ -95,16 +119,165 @@ class user:
 class scanner:
 
 	@classmethod
-	def liveHosts(self, logfile, target):
+	def livehosts(self, target):
 
-		log.info(logfile, 'Target: {0} Scan Type: ICMP echo.'.format(args.target))
-		
-		nmapLogFilePrefix = "live-hosts-icmp-echo-scan-{0}-{1}".format(datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
-		command = "nmap -vv -n -sn -PE -oA {0} {1}".format(nmapLogFilePrefix, args.target)
+		log.info('Scanning target {0} for live hosts.'.format(target))
+		scanner.liveHostsIcmpEcho(LiveHostsDir, target)
 
-		log.info(logfile, 'Command: {0}'.format(command))
-		log.info(logfile, 'Nmap Output:')
-		log.info(logfile, '****************************************************************************')
+		scanner.liveHostsTcpAck(LiveHostsDir, target)
+
+		scanner.liveHostsTcpSyn(LiveHostsDir, target)
+
+		scanner.liveHostsSctp(LiveHostsDir, target)
+
+		scanner.liveHostsUdp(LiveHostsDir, target)
+
+		scanner.liveHostsProtocolPing(LiveHostsDir, target)
+
+		scanner.liveHostsTimestamp(LiveHostsDir, target)
+
+		scanner.liveHostsNetmask(LiveHostsDir, target)
+
+		scanner.liveHostsTopTcp100(LiveHostsDir, target)
+
+		log.info('Scanning target {0} for live hosts completed.'.format(target))
+
+
+	@classmethod
+	def liveHostsIcmpEcho(self, outputDir, target):
+
+		prefix = 'live-hosts-icmp-echo-scan'
+
+		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+
+		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
+
+		command = "nmap -vv -n -sn -PE -oA {0} {1}".format(outputDir, args.target)
+
+		scanner.scan('ICMP echo', outputDir, command, target)
+
+	@classmethod
+	def liveHostsTcpAck(self, outputDir, target):
+
+		prefix = 'live-hosts-tcp-ack-scan'
+
+		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+
+		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
+
+		command = "nmap -vv -n -sn -PA21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} {1}".format(outputDir, args.target)
+
+		scanner.scan('TCP ACK', outputDir, command, target)
+
+	@classmethod
+	def liveHostsTcpSyn(self, outputDir, target):
+
+		prefix = 'live-hosts-tcp-syn-scan'
+
+		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+
+		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
+
+		command = "nmap -vv -n -sn -PS21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} {1}".format(outputDir, args.target)
+
+		scanner.scan('TCP SYN', outputDir, command, target)
+
+
+	@classmethod
+	def liveHostsSctp(self, outputDir, target):
+
+		prefix = 'live-hosts-sctp-scan'
+
+		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+
+		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
+
+		command = "nmap -vv -n -sn -PY132,2905 -oA {0} {1}".format(outputDir, args.target)
+
+		scanner.scan('SCTP', outputDir, command, target)
+
+	@classmethod
+	def liveHostsUdp(self, outputDir, target):
+
+		prefix = 'live-hosts-udp-scan'
+
+		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+
+		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
+
+		command = "nmap -vv -n -sn -PU53,67,68,69,123,135,137,138,139,161,162,445,500,514,520,631,1434,1600,4500,49152 -oA {0} {1}".format(outputDir, args.target)
+
+		scanner.scan('UDP', outputDir, command, target)
+
+	@classmethod
+	def liveHostsProtocolPing(self, outputDir, target):
+
+		prefix = 'live-hosts-protocol-ping-scan'
+
+		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+
+		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
+
+		command = "nmap -vv -n -sn -PO -oA {0} {1}".format(outputDir, args.target)
+
+		scanner.scan('Protocol Ping', outputDir, command, target)
+
+	@classmethod
+	def liveHostsTimestamp(self, outputDir, target):
+
+		prefix = 'live-hosts-timestamp-scan'
+
+		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+
+		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
+
+		command = "nmap -vv -n -sn -PP -oA {0} {1}".format(outputDir, args.target)
+
+		scanner.scan('Timestamp', outputDir, command, target)
+
+	@classmethod
+	def liveHostsNetmask(self, outputDir, target):
+
+		prefix = 'live-hosts-netmask-scan'
+
+		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+
+		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
+
+		command = "nmap -vv -n -sn -PM -oA {0} {1}".format(outputDir, args.target)
+
+		scanner.scan('Netmask', outputDir, command, target)
+
+	@classmethod
+	def liveHostsTopTcp100(self, outputDir, target):
+
+		prefix = 'live-hosts-top-tcp-100-scan'
+
+		nmapLogFilePrefix = "{0}-{1}-{2}".format(prefix, 
+			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), args.target.replace('/', '_'))
+
+		outputDir = os.path.join(outputDir, nmapLogFilePrefix)
+
+		command = "nmap -vv -sS -n -Pn --top-ports 100 --reason --open -T4 -oA {0} {1}".format(outputDir, args.target)
+
+		scanner.scan('Top TCP 100', outputDir, command, target)
+
+
+	@classmethod
+	def scan(self, type, nmapLogFilePrefix, command, target):
+
+		log.info('Target: {0} Scan Type: {1}'.format(args.target, type))
+		log.info('Command: {0}'.format(command))
+		log.info('Nmap Output:')
+		log.info('********************************* START *********************************')
 
 		try:
 
@@ -112,43 +285,44 @@ class scanner:
 
 		except:
 			e = sys.exc_info()[0]
-			log.error(logfile, "An error occured during nmap scan (Live Hosts, ICMP echo): {0}.".format(e))
+			log.error("An error occured during nmap scan ({0}): {1}.".format(type, e))
 
 		try:
 			nmapOutput = ''
 			with open(nmapLogFilePrefix + ".nmap", 'r') as file:
 				nmapOutput = file.read()
 
-			with open(logfile, 'a') as file:
+			with open(LogsFile, 'a') as file:
 				file.write(nmapOutput)
 		except:
 			e = sys.exc_info()[0]
-			log.error(logfile, "An error occured while trying to append nmap scan output to log file '{0}': {1}.".format(logfile, e))
+			log.error("An error occured while trying to append nmap scan output to log file '{0}': {1}.".format(LogsFile, e))
 
-		log.info(logfile, '****************************************************************************')
+		log.info('********************************* END *********************************')
 
 
 
 #####################################################################################################################
-def main(args,extra,logfile):
+def main(args,extra):
 
-	log.info(logfile, 'Scanning target {0} for live hosts.'.format(args.target))
-	scanner.liveHosts(logfile, args.target)
+	fm.createProjectDirStructure(args.project_name, args.working_dir)
+
+	if not user.isRoot():
+		exit(1)
+
+	scanner.livehosts(args.target)
 
 
 
 #####################################################################################################################
 if __name__ == '__main__':
 
-	logfile = 'logs.txt'
-
-	if not user.isRoot(logfile):
-		exit(1)
-
 	parser = argparse.ArgumentParser()
 
 	parser.add_argument('-t', '--target', help='target IP or IP range', required=True)
 	parser.add_argument('-st', '--scan-type', help='network scan type (internal or external)', required=True)
-	parser.add_argument('-p', '--project', help='project name', required=True)
+	parser.add_argument('-p', '--project-name', help='project name', required=True)
+	parser.add_argument('-w', '--working-dir', help='working directory', required=True)
+
 	args,extra = parser.parse_known_args()
-	main(args,extra,logfile)
+	main(args,extra)
