@@ -22,6 +22,7 @@
 #
 #    For more see the file 'LICENSE' for copying permission.
 
+
 # Created by @maldevel
 # Logisek
 # https://pentest-labs.com
@@ -197,7 +198,9 @@ class grep:
 		message = Fore.CYAN + "Task completed in {0}.".format(help.elapsedTime(start)) + Fore.RESET
 		log.info(message)
 
-		LiveHostsList = cmdOutput.split('\n')
+		LiveHostsList = list(filter(bool, cmdOutput.split('\n')))
+		log.info("{0} live hosts detected.".format(len(LiveHostsList)))
+
 		help.writeMD(md.genLiveHosts(LiveHostsList), LiveHostsMDFile)
 
 		return cmdOutput
