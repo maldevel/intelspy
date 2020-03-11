@@ -45,6 +45,8 @@ import colorama
 from colorama import Fore, Style
 import time
 import ipaddress
+import sqlite3
+from sqlite3 import Error
 
 
 
@@ -61,7 +63,9 @@ LiveHostsListFile = ''
 InternalPTMode = False
 LiveHostsList = []
 LiveHostsMDFile = ''
-
+DatabaseDir = ''
+DatabaseFile = ''
+DbConnection = None
 
 
 #####################################################################################################################
@@ -78,6 +82,56 @@ https://pentest-labs.com/
 https://github.com/maldevel/intelspy
 
 """.format(__version__)
+
+
+
+#####################################################################################################################
+class db:
+	@classmethod
+	def connect(self):
+		global DatabaseFile, DbConnection
+
+		try:
+			DbConnection = sqlite3.connect(DatabaseFile)
+			db.createLiveHostsTbl()
+
+			log.info('Database file {0}.'.format(DatabaseFile))
+		except Exception as e:
+			log.error("An error occured during sqlite3 database connection: {0}.".format(str(e)))
+			if DbConnection:
+				DbConnection.close()
+			exit(1)
+
+	@classmethod
+	def disconnect(self):
+		global DbConnection
+
+		try:
+			if DbConnection:
+				DbConnection.close()
+		except Exception as e:
+			log.error("An error occured during sqlite3 database connection: {0}.".format(str(e)))
+			exit(1)
+	
+	@classmethod
+	def addLiveHost(self, liveHost):
+		global DbConnection
+
+		c = DbConnection.cursor()
+		c.execute('''REPLACE INTO live_hosts(Ipaddr) 
+			VALUES(?);''', [liveHost])
+		DbConnection.commit()
+		id = c.lastrowid
+		c.close()
+		return id
+
+	@classmethod
+	def createLiveHostsTbl(self):
+		global DbConnection
+
+		DbConnection.execute('''CREATE TABLE live_hosts
+         (ID INTEGER PRIMARY KEY AUTOINCREMENT,
+         Ipaddr CHAR(50) UNIQUE NOT NULL);''')
 
 
 
@@ -158,6 +212,8 @@ class help:
 
 	    return ', '.join(tt)
 
+
+
 #####################################################################################################################
 class grep:
 
@@ -179,9 +235,8 @@ class grep:
 			start = time.time()
 			exec.run(command, True)
 
-		except:
-			e = sys.exc_info()[0]
-			log.error("An error occured during nmap scan results grep: {0}.".format(e))
+		except Exception as e:
+			log.error("An error occured during nmap scan results grep: {0}.".format(str(e)))
 
 		try:
 			with open(LiveHostsListFile, 'r') as file:
@@ -190,8 +245,7 @@ class grep:
 			with open(LogsFile, 'a') as file:
 				file.write(cmdOutput)
 
-		except:
-			e = sys.exc_info()[0]
+		except Exception as e:
 			log.error("An error occured while trying to append grep result to log file '{0}': {1}.".format(LogsFile, e))
 
 		
@@ -203,6 +257,9 @@ class grep:
 
 		help.writeMD(md.genLiveHosts(LiveHostsList), LiveHostsMDFile)
 
+		for host in LiveHostsList:
+			print(db.addLiveHost(host))
+
 		return cmdOutput
 
 
@@ -212,23 +269,26 @@ class fm:
 
 	@classmethod
 	def createProjectDirStructure(self, target, projName, workingDir):
-		global ProjectDir, LiveHostsDir, LogsDir, LogsFile, ReportDir, LiveHostsListFile, LiveHostsMDFile
+		global ProjectDir, LiveHostsDir, LogsDir, LogsFile, ReportDir, LiveHostsListFile, LiveHostsMDFile, DatabaseDir, DatabaseFile
 
 		ProjectDir = os.path.join(workingDir, projName)
 		ScansDir = os.path.join(ProjectDir, 'scans')
-		
+		DatabaseDir = os.path.join(ProjectDir, 'db')
+		DatabaseFile = os.path.join(DatabaseDir, "{0}-{1}.db".format(projName, datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+
 		LiveHostsDir = os.path.join(ScansDir, 'live-hosts', target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 		
 		LogsDir = os.path.join(ProjectDir, 'logs', target.replace('/', '_'))
 		LogsFile = os.path.join(LogsDir, "{0}-log-{1}-{2}.txt".format(projName, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 		
-		ReportDir = os.path.join(ProjectDir, 'report', target.replace('/', '_'))
+		ReportDir = os.path.join(ProjectDir, 'report', target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 		LiveHostsListFile = os.path.join(ReportDir, "{0}-live-hosts-list-{1}-{2}.txt".format(projName, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 		LiveHostsMDFile = LiveHostsListFile.replace('.txt', '.md')
 
 		Path(LiveHostsDir).mkdir(parents=True, exist_ok=True)
 		Path(LogsDir).mkdir(parents=True, exist_ok=True)
 		Path(ReportDir).mkdir(parents=True, exist_ok=True)
+		Path(DatabaseDir).mkdir(parents=True, exist_ok=True)
 
 		log.info("Creating project directory structure '{0}'.".format(ProjectDir))		
 
@@ -267,8 +327,7 @@ class log:
 			with open(LogsFile, "a") as logFile:
 				logFile.write("[{0} {1}] {2} EventID={3} Type={4} Log=\"{5}\"\n".format(datetime.now().strftime("%d/%b/%Y:%H:%M:%S"), 
 					datetime.now(timezone.utc).astimezone().strftime('%z'), socket.gethostname(), eventID, logType, logStr))
-		except:
-			e = sys.exc_info()[0]
+		except Exception as e:
 			print("[{0} {1}] {2} '{3}': {4}\n".format(datetime.now().strftime("%d/%b/%Y:%H:%M:%S"), 
 				datetime.now(timezone.utc).astimezone().strftime('%z'), "There is a problem writing to the log file", LogsFile, e))
 			sys.exit()
@@ -446,8 +505,7 @@ class scanner:
 		try:
 			exec.run(shlex.split(command), False)
 
-		except:
-			e = sys.exc_info()[0]
+		except Exception as e:
 			log.error("An error occured during nmap scan ({0}): {1}.".format(type, e))
 
 		try:
@@ -458,11 +516,10 @@ class scanner:
 			with open(LogsFile, 'a') as file:
 				file.write(nmapOutput)
 
-		except:
-			e = sys.exc_info()[0]
-			log.error("An error occured while trying to append nmap scan output to log file '{0}': {1}.".format(LogsFile, e))
+		except Exception as e:
+			log.error("An error occured while trying to append nmap scan output to log file '{0}': {1}.".format(LogsFile, str(e)))
 
-		
+
 		message = Fore.CYAN + "Task completed in {0}.".format(help.elapsedTime(start)) + Fore.RESET
 		log.info(message)
 
@@ -475,6 +532,7 @@ def main(args,extra):
 	global LiveHostsList
 
 	fm.createProjectDirStructure(args.target, args.project_name, args.working_dir)
+	db.connect()
 
 	if not user.isRoot():
 		exit(1)
@@ -490,6 +548,8 @@ def main(args,extra):
 	scanner.livehosts(args.project_name, args.target, args.exclude)
 
 	grep.liveHosts(args.target)
+
+	db.disconnect()
 
 
 
