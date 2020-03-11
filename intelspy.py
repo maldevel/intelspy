@@ -66,6 +66,8 @@ LiveHostsMDFile = ''
 DatabaseDir = ''
 DatabaseFile = ''
 DbConnection = None
+CommandsDir = ''
+CommandsFile = ''
 
 
 #####################################################################################################################
@@ -234,7 +236,8 @@ class grep:
 
 			start = time.time()
 			exec.run(command, True)
-
+			log.writeCmdLog(command)
+			
 		except Exception as e:
 			log.error("An error occured during nmap scan results grep: {0}.".format(str(e)))
 
@@ -258,7 +261,7 @@ class grep:
 		help.writeMD(md.genLiveHosts(LiveHostsList), LiveHostsMDFile)
 
 		for host in LiveHostsList:
-			print(db.addLiveHost(host))
+			db.addLiveHost(host)
 
 		return cmdOutput
 
@@ -269,12 +272,14 @@ class fm:
 
 	@classmethod
 	def createProjectDirStructure(self, target, projName, workingDir):
-		global ProjectDir, LiveHostsDir, LogsDir, LogsFile, ReportDir, LiveHostsListFile, LiveHostsMDFile, DatabaseDir, DatabaseFile
+		global ProjectDir, LiveHostsDir, LogsDir, LogsFile, ReportDir, LiveHostsListFile, LiveHostsMDFile, DatabaseDir, DatabaseFile, CommandsDir, CommandsFile
 
 		ProjectDir = os.path.join(workingDir, projName)
 		ScansDir = os.path.join(ProjectDir, 'scans')
 		DatabaseDir = os.path.join(ProjectDir, 'db')
 		DatabaseFile = os.path.join(DatabaseDir, "{0}-{1}.db".format(projName, datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+		CommandsDir = os.path.join(ProjectDir, 'commands')
+		CommandsFile = os.path.join(CommandsDir, "{0}-{1}-commands-log.txt".format(projName, datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 
 		LiveHostsDir = os.path.join(ScansDir, 'live-hosts', target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 		
@@ -289,6 +294,7 @@ class fm:
 		Path(LogsDir).mkdir(parents=True, exist_ok=True)
 		Path(ReportDir).mkdir(parents=True, exist_ok=True)
 		Path(DatabaseDir).mkdir(parents=True, exist_ok=True)
+		Path(CommandsDir).mkdir(parents=True, exist_ok=True)
 
 		log.info("Creating project directory structure '{0}'.".format(ProjectDir))		
 
@@ -318,6 +324,7 @@ class log:
 	@classmethod
 	def write(self, logType, logStr, color):
 		global LogsFile
+
 		eventID = str(log.nextEventID())
 
 		print("[{0} {1}] ".format(datetime.now().strftime("%d/%b/%Y:%H:%M:%S"), 
@@ -329,12 +336,25 @@ class log:
 					datetime.now(timezone.utc).astimezone().strftime('%z'), socket.gethostname(), eventID, logType, logStr))
 		except Exception as e:
 			print("[{0} {1}] {2} '{3}': {4}\n".format(datetime.now().strftime("%d/%b/%Y:%H:%M:%S"), 
-				datetime.now(timezone.utc).astimezone().strftime('%z'), "There is a problem writing to the log file", LogsFile, e))
+				datetime.now(timezone.utc).astimezone().strftime('%z'), "There is a problem writing to the log file", LogsFile, str(e)))
 			sys.exit()
 
 		return
 
+	@classmethod
+	def writeCmdLog(self, cmd):
+		global CommandsFile
 
+		try:
+			with open(CommandsFile, "a") as logFile:
+				logFile.write("[{0} {1}] {2} Log=\"{3}\"\n".format(datetime.now().strftime("%d/%b/%Y:%H:%M:%S"), 
+					datetime.now(timezone.utc).astimezone().strftime('%z'), socket.gethostname(), cmd))
+		except Exception as e:
+			print("[{0} {1}] {2} '{3}': {4}\n".format(datetime.now().strftime("%d/%b/%Y:%H:%M:%S"), 
+				datetime.now(timezone.utc).astimezone().strftime('%z'), "There is a problem writing to the log file", LogsFile, str(e)))
+			sys.exit()
+
+		return
 
 #####################################################################################################################
 class user:
@@ -504,6 +524,7 @@ class scanner:
 
 		try:
 			exec.run(shlex.split(command), False)
+			log.writeCmdLog(command)
 
 		except Exception as e:
 			log.error("An error occured during nmap scan ({0}): {1}.".format(type, e))
