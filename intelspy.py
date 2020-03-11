@@ -71,6 +71,8 @@ CommandsFile = ''
 TopTcpPortsDir = ''
 TopTcpPortsFile = ''
 TopTcpPortsMatrixFile = ''
+TopTcpPortsList = []
+TopTcpPortsMDFile = ''
 
 
 #####################################################################################################################
@@ -162,6 +164,18 @@ class md:
 		data += "\n---\n"
 		return data
 
+	@classmethod
+	def genTopPorts(self, topPorts, topNum):
+		data = "## Top {0} TCP Ports\n\n".format(topNum)
+		for key, value in topPorts.items():
+			data += "### {0}\n\n".format(key)
+			if value != "":
+				for port in value:
+					data += "* " + port + "\n"
+				data += "\n"
+			data += "---\n\n"
+		return data
+
 
 
 #####################################################################################################################
@@ -234,8 +248,8 @@ class help:
 class grep:
 
 	@classmethod
-	def openPorts(self, target):
-		global TopTcpPortsDir, TopTcpPortsFile, LogsFile, LiveHostsMDFile
+	def openPorts(self, target, numOfPorts):
+		global TopTcpPortsDir, TopTcpPortsFile, TopTcpPortsList, LogsFile, TopTcpPortsMDFile
 		
 		cmdOutput = ''
 
@@ -279,10 +293,24 @@ class grep:
 		message = "Task completed in {0}.".format(help.elapsedTime(start))
 		log.infoPickC(message, Fore.CYAN)
 
-		#LiveHostsList = list(filter(bool, cmdOutput.split('\n')))
-		#log.info("{0} live hosts detected.".format(len(LiveHostsList)))
+		TopTcpPortsList = list(filter(bool, cmdOutput2.split('\n')))
+		portsCounter = 0
+		openPortsDict = {}
+		for line in TopTcpPortsList:
+			data = list(filter(bool, line.split(';')))
+			host = data[0]
+			ports = list(filter(bool, data[2].split(',')))
+			portsCounter += len(ports)
+			openPortsDict[host] = ports
+			#print(host)
+			#print(numOfPorts)
+			#for port in ports:
+				#print(port)
+			#	portsCounter += 1
+			#hostsCounter += 1
 
-		#help.writeMD(md.genLiveHosts(LiveHostsList), LiveHostsMDFile)
+		log.info("{0} open TCP ports detected on {1} hosts.".format(portsCounter, len(TopTcpPortsList)))
+		help.writeMD(md.genTopPorts(openPortsDict, numOfPorts), TopTcpPortsMDFile)
 
 		#for host in LiveHostsList:
 		#	db.addLiveHost(host)
@@ -342,7 +370,7 @@ class fm:
 
 	@classmethod
 	def createProjectDirStructure(self, target, projName, workingDir, defaultTopTcpPorts):
-		global ProjectDir, LiveHostsDir, LogsDir, LogsFile, ReportDir, LiveHostsListFile, LiveHostsMDFile, DatabaseDir, DatabaseFile, CommandsDir, CommandsFile, TopTcpPortsDir, TopTcpPortsFile, TopTcpPortsMatrixFile
+		global ProjectDir, LiveHostsDir, LogsDir, LogsFile, ReportDir, LiveHostsListFile, LiveHostsMDFile, DatabaseDir, DatabaseFile, CommandsDir, CommandsFile, TopTcpPortsDir, TopTcpPortsFile, TopTcpPortsMatrixFile, TopTcpPortsMDFile
 
 		ProjectDir = os.path.join(workingDir, projName)
 		ScansDir = os.path.join(ProjectDir, 'scans')
@@ -364,6 +392,7 @@ class fm:
 
 		TopTcpPortsFile = os.path.join(ReportDir, "{0}-top-{1}-{2}-{3}.txt".format(projName, defaultTopTcpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 		TopTcpPortsMatrixFile = os.path.join(ReportDir, "{0}-top-{1}-{2}-{3}-matrix.txt".format(projName, defaultTopTcpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+		TopTcpPortsMDFile = TopTcpPortsFile.replace('.txt', '.md')
 
 		Path(LiveHostsDir).mkdir(parents=True, exist_ok=True)
 		Path(TopTcpPortsDir).mkdir(parents=True, exist_ok=True)
@@ -668,7 +697,7 @@ def main(args,extra):
 
 	scanner.topTcpPorts(args.project_name, defaultTopTcpPorts)
 
-	grep.openPorts(args.target)
+	grep.openPorts(args.target, defaultTopTcpPorts)
 
 	db.disconnect()
 
