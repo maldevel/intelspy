@@ -302,12 +302,6 @@ class grep:
 			ports = list(filter(bool, data[2].split(',')))
 			portsCounter += len(ports)
 			openPortsDict[host] = ports
-			#print(host)
-			#print(numOfPorts)
-			#for port in ports:
-				#print(port)
-			#	portsCounter += 1
-			#hostsCounter += 1
 
 		log.info("{0} open TCP ports detected on {1} hosts.".format(portsCounter, len(TopTcpPortsList)))
 		help.writeMD(md.genTopPorts(openPortsDict, numOfPorts), TopTcpPortsMDFile)
