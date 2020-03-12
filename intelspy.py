@@ -47,6 +47,7 @@ import time
 import ipaddress
 import sqlite3
 from sqlite3 import Error
+import re
 
 
 
@@ -73,6 +74,7 @@ TopTcpPortsFile = ''
 TopTcpPortsMatrixFile = ''
 TopTcpPortsList = []
 TopTcpPortsMDFile = ''
+TopTcpPortsUniqueFile = ''
 
 
 #####################################################################################################################
@@ -101,6 +103,7 @@ class db:
 		try:
 			DbConnection = sqlite3.connect(DatabaseFile)
 			db.createLiveHostsTbl()
+			db.createTopTcpPortsTbl()
 
 			log.info('Database file {0}.'.format(DatabaseFile))
 		except Exception as e:
@@ -133,6 +136,18 @@ class db:
 		return id
 
 	@classmethod
+	def addTopTcpPort(self, host, ports):
+		global DbConnection
+
+		c = DbConnection.cursor()
+		c.execute('''REPLACE INTO top_tcp_ports(Ipaddr,Ports) 
+			VALUES(?,?);''', (host,ports))
+		DbConnection.commit()
+		id = c.lastrowid
+		c.close()
+		return id
+
+	@classmethod
 	def getLiveHosts(self):
 		global DbConnection
 
@@ -149,7 +164,16 @@ class db:
 
 		DbConnection.execute('''CREATE TABLE live_hosts
          (ID INTEGER PRIMARY KEY AUTOINCREMENT,
-         Ipaddr CHAR(50) UNIQUE NOT NULL);''')
+         Ipaddr VARCHAR(50) UNIQUE NOT NULL);''')
+
+	@classmethod
+	def createTopTcpPortsTbl(self):
+		global DbConnection
+
+		DbConnection.execute('''CREATE TABLE top_tcp_ports
+         (ID INTEGER PRIMARY KEY AUTOINCREMENT,
+         Ipaddr VARCHAR(50) UNIQUE NOT NULL, 
+         Ports TEXT NOT NULL);''')
 
 
 
@@ -259,7 +283,7 @@ class grep:
 			command = "egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-| sed 's/Ignored.*//g' | awk '{{printf \"Host: \" $1 \"\\nOpen ports: \" NF-1 \"\\n\"; $1=\"\"; for(i=2; i<=NF; i++) {{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); printf \"%s\\t%s\\n\", v[1], v[5]}}; a=\"\"; printf \"\\n\"; }}'| tee {1}".format(gnmapFilesDir, TopTcpPortsFile)
 			commandMatrix = "egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-| sed 's/Ignored.*//g' | awk '{{printf $1 \";\" NF-1 \";\"; $1=\"\"; for(i=2; i<=NF; i++) {{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); printf \"%s(%s),\", v[1], v[5]}}; a=\"\"; printf \"\\n\"; }}'> {1}".format(gnmapFilesDir, TopTcpPortsMatrixFile)
 			
-			log.info('Hosts with opened ports of target {0}.'.format(target))
+			log.info('Hosts with Top {0} TCP ports opened({1}).'.format(numOfPorts,target))
 			log.debug('Command: {0}'.format(command))
 			log.info('Output')
 
@@ -296,18 +320,29 @@ class grep:
 		TopTcpPortsList = list(filter(bool, cmdOutput2.split('\n')))
 		portsCounter = 0
 		openPortsDict = {}
+		allPorts = []
 		for line in TopTcpPortsList:
 			data = list(filter(bool, line.split(';')))
 			host = data[0]
 			ports = list(filter(bool, data[2].split(',')))
+			allPorts += ports
 			portsCounter += len(ports)
 			openPortsDict[host] = ports
 
 		log.info("{0} open TCP ports detected on {1} hosts.".format(portsCounter, len(TopTcpPortsList)))
 		help.writeMD(md.genTopPorts(openPortsDict, numOfPorts), TopTcpPortsMDFile)
 
-		#for host in LiveHostsList:
-		#	db.addLiveHost(host)
+		for host, ports in openPortsDict.items():
+			db.addTopTcpPort(host, ','.join(ports))
+
+		for index, item in enumerate(allPorts):
+			allPorts[index] = int(re.sub(r"\(.*\)", "", allPorts[index]))
+		
+		uniquePorts = sorted(set(allPorts))
+		log.info("{0} unique open TCP ports: {1}".format(len(uniquePorts), ','.join(str(s) for s in uniquePorts)))
+		
+		with open(TopTcpPortsUniqueFile, 'w') as file:
+			file.write(','.join(str(s) for s in uniquePorts))
 
 		return cmdOutput
 
@@ -364,7 +399,7 @@ class fm:
 
 	@classmethod
 	def createProjectDirStructure(self, target, projName, workingDir, defaultTopTcpPorts):
-		global ProjectDir, LiveHostsDir, LogsDir, LogsFile, ReportDir, LiveHostsListFile, LiveHostsMDFile, DatabaseDir, DatabaseFile, CommandsDir, CommandsFile, TopTcpPortsDir, TopTcpPortsFile, TopTcpPortsMatrixFile, TopTcpPortsMDFile
+		global ProjectDir, LiveHostsDir, LogsDir, LogsFile, ReportDir, LiveHostsListFile, LiveHostsMDFile, DatabaseDir, DatabaseFile, CommandsDir, CommandsFile, TopTcpPortsDir, TopTcpPortsFile, TopTcpPortsMatrixFile, TopTcpPortsMDFile, TopTcpPortsUniqueFile
 
 		ProjectDir = os.path.join(workingDir, projName)
 		ScansDir = os.path.join(ProjectDir, 'scans')
@@ -384,9 +419,10 @@ class fm:
 		LiveHostsListFile = os.path.join(ReportDir, "{0}-live-hosts-list-{1}-{2}.txt".format(projName, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 		LiveHostsMDFile = LiveHostsListFile.replace('.txt', '.md')
 
-		TopTcpPortsFile = os.path.join(ReportDir, "{0}-top-{1}-{2}-{3}.txt".format(projName, defaultTopTcpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
-		TopTcpPortsMatrixFile = os.path.join(ReportDir, "{0}-top-{1}-{2}-{3}-matrix.txt".format(projName, defaultTopTcpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+		TopTcpPortsFile = os.path.join(ReportDir, "{0}-top-{1}-ports-{2}-{3}.txt".format(projName, defaultTopTcpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+		TopTcpPortsMatrixFile = os.path.join(ReportDir, "{0}-top-{1}-ports-{2}-{3}-matrix.txt".format(projName, defaultTopTcpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 		TopTcpPortsMDFile = TopTcpPortsFile.replace('.txt', '.md')
+		TopTcpPortsUniqueFile = os.path.join(ReportDir, "{0}-top-{1}-ports-{2}-{3}-unique.txt".format(projName, defaultTopTcpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 
 		Path(LiveHostsDir).mkdir(parents=True, exist_ok=True)
 		Path(TopTcpPortsDir).mkdir(parents=True, exist_ok=True)
