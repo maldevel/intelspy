@@ -346,12 +346,14 @@ class grep:
 	@classmethod
 	def openUdpPorts(self, target, numOfPorts):
 		global TopUdpPortsDir,TopUdpPortsFile, TopUdpPortsMDFile, TopUdpPortsUniqueFile, TopUdpPortsMatrixFile
-		grep.openPorts('UDP', target, numOfPorts, TopUdpPortsDir, TopUdpPortsFile, TopUdpPortsMDFile, TopUdpPortsUniqueFile, TopUdpPortsMatrixFile)
+		grep.openPorts('UDP', target, numOfPorts, TopUdpPortsDir, TopUdpPortsFile, 
+			TopUdpPortsMDFile, TopUdpPortsUniqueFile, TopUdpPortsMatrixFile)
 
 	@classmethod
 	def openTcpPorts(self, target, numOfPorts):
 		global TopTcpPortsDir,TopTcpPortsFile, TopTcpPortsMDFile, TopTcpPortsUniqueFile, TopTcpPortsMatrixFile
-		grep.openPorts('TCP', target, numOfPorts, TopTcpPortsDir, TopTcpPortsFile, TopTcpPortsMDFile, TopTcpPortsUniqueFile, TopTcpPortsMatrixFile)
+		grep.openPorts('TCP', target, numOfPorts, TopTcpPortsDir, TopTcpPortsFile, 
+			TopTcpPortsMDFile, TopTcpPortsUniqueFile, TopTcpPortsMatrixFile)
 
 	@classmethod
 	def openPorts(self, scanType, target, numOfPorts, path, portsFile, portsMDfile, portsUniqueFile, portsMatrixFile):
@@ -732,9 +734,11 @@ class scanner:
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-tcp-ack-scan', outputDir, target.replace('/', '_'))
 		if exclude:
 			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -n -sn -PA21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
+			command = """nmap -vv -n -sn -PA21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,
+			465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} --exclude {1} {2}""".format(outputDir, exclude, target)
 		else:
-			command = "nmap -vv -n -sn -PA21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} {1}".format(outputDir, target)
+			command = """nmap -vv -n -sn -PA21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,
+			465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} {1}""".format(outputDir, target)
 		scanner.scan('TCP ACK', outputDir, command, target)
 
 
@@ -744,9 +748,11 @@ class scanner:
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-tcp-syn-scan', outputDir, target.replace('/', '_'))
 		if exclude:
 			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -n -sn -PS21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
+			command = """nmap -vv -n -sn -PS21,22,23,25,53,80,88,110,111,135,139,143,199,
+			443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} --exclude {1} {2}""".format(outputDir, exclude, target)
 		else:
-			command = "nmap -vv -n -sn -PS21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} {1}".format(outputDir, target)
+			command = """nmap -vv -n -sn -PS21,22,23,25,53,80,88,110,111,135,139,143,199,
+			443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} {1}""".format(outputDir, target)
 		scanner.scan('TCP SYN', outputDir, command, target)
 
 
@@ -768,9 +774,11 @@ class scanner:
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-udp-scan', outputDir, target.replace('/', '_'))
 		if exclude:
 			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -n -sn -PU53,67,68,69,123,135,137,138,139,161,162,445,500,514,520,631,1434,1600,4500,49152 -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
+			command = """nmap -vv -n -sn -PU53,67,68,69,123,135,137,138,139,161,162,
+			445,500,514,520,631,1434,1600,4500,49152 -oA {0} --exclude {1} {2}""".format(outputDir, exclude, target)
 		else:
-			command = "nmap -vv -n -sn -PU53,67,68,69,123,135,137,138,139,161,162,445,500,514,520,631,1434,1600,4500,49152 -oA {0} {1}".format(outputDir, target)
+			command = """nmap -vv -n -sn -PU53,67,68,69,123,135,137,138,139,161,162,
+			445,500,514,520,631,1434,1600,4500,49152 -oA {0} {1}""".format(outputDir, target)
 		scanner.scan('UDP', outputDir, command, target)
 
 
