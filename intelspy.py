@@ -26,7 +26,7 @@
 # Created by @maldevel
 # Logisek
 # https://pentest-labs.com
-# scan.py Version 1.0
+# intelspy.py Version 1.0
 # Released under GPL Version 3 License
 # March 2020
 
@@ -70,11 +70,15 @@ DbConnection = None
 CommandsDir = ''
 CommandsFile = ''
 TopTcpPortsDir = ''
+TopUdpPortsDir = ''
 TopTcpPortsFile = ''
+TopUdpPortsFile = ''
 TopTcpPortsMatrixFile = ''
-TopTcpPortsList = []
+TopUdpPortsMatrixFile = ''
 TopTcpPortsMDFile = ''
+TopUdpPortsMDFile = ''
 TopTcpPortsUniqueFile = ''
+TopUdpPortsUniqueFile = ''
 
 
 #####################################################################################################################
@@ -189,9 +193,9 @@ class md:
 		return data
 
 	@classmethod
-	def genTopPorts(self, topPorts, topNum):
-		data = "## Top {0} TCP Ports\n\n".format(topNum)
-		for key, value in topPorts.items():
+	def genTopPorts(self, topOpenPorts, topNum, scanType):
+		data = "## Top {0} {1} Ports\n\n".format(topNum,scanType)
+		for key, value in topOpenPorts.items():
 			data += "### {0}\n\n".format(key)
 			if value != "":
 				for port in value:
@@ -272,18 +276,28 @@ class help:
 class grep:
 
 	@classmethod
-	def openPorts(self, target, numOfPorts):
-		global TopTcpPortsDir, TopTcpPortsFile, TopTcpPortsList, LogsFile, TopTcpPortsMDFile
-		
+	def openUdpPorts(self, target, numOfPorts):
+		global TopUdpPortsDir,TopUdpPortsFile, TopUdpPortsMDFile, TopUdpPortsUniqueFile, TopUdpPortsMatrixFile
+		grep.openPorts('UDP', target, numOfPorts, TopUdpPortsDir, TopUdpPortsFile, TopUdpPortsMDFile, TopUdpPortsUniqueFile, TopUdpPortsMatrixFile)
+
+	@classmethod
+	def openTcpPorts(self, target, numOfPorts):
+		global TopTcpPortsDir,TopTcpPortsFile, TopTcpPortsMDFile, TopTcpPortsUniqueFile, TopTcpPortsMatrixFile
+		grep.openPorts('TCP', target, numOfPorts, TopTcpPortsDir, TopTcpPortsFile, TopTcpPortsMDFile, TopTcpPortsUniqueFile, TopTcpPortsMatrixFile)
+
+	@classmethod
+	def openPorts(self, scanType, target, numOfPorts, path, portsFile, portsMDfile, portsUniqueFile, portsMatrixFile):
+		global LogsFile
+
 		cmdOutput = ''
 
 		try:
 
-			gnmapFilesDir = os.path.join(TopTcpPortsDir, '*.gnmap')
-			command = "egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-| sed 's/Ignored.*//g' | awk '{{printf \"Host: \" $1 \"\\nOpen ports: \" NF-1 \"\\n\"; $1=\"\"; for(i=2; i<=NF; i++) {{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); printf \"%s\\t%s\\n\", v[1], v[5]}}; a=\"\"; printf \"\\n\"; }}'| tee {1}".format(gnmapFilesDir, TopTcpPortsFile)
+			gnmapFilesDir = os.path.join(path, '*.gnmap')
+			command = "egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-| sed 's/Ignored.*//g' | awk '{{printf \"Host: \" $1 \"\\nOpen ports: \" NF-1 \"\\n\"; $1=\"\"; for(i=2; i<=NF; i++) {{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); printf \"%s\\t%s\\n\", v[1], v[5]}}; a=\"\"; printf \"\\n\"; }}'| tee {1}".format(gnmapFilesDir, portsFile)
 			commandMatrix = "egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-| sed 's/Ignored.*//g' | awk '{{printf $1 \";\" NF-1 \";\"; $1=\"\"; for(i=2; i<=NF; i++) {{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); printf \"%s(%s),\", v[1], v[5]}}; a=\"\"; printf \"\\n\"; }}'> {1}".format(gnmapFilesDir, TopTcpPortsMatrixFile)
 			
-			log.info('Hosts with Top {0} TCP ports opened({1}).'.format(numOfPorts,target))
+			log.info('Hosts with Top {0} {1} ports open({2}).'.format(numOfPorts,scanType,target))
 			log.debug('Command: {0}'.format(command))
 			log.info('Output')
 
@@ -298,7 +312,7 @@ class grep:
 			log.error("An error occured during nmap scan results grep: {0}.".format(str(e)))
 
 		try:
-			with open(TopTcpPortsFile, 'r') as file:
+			with open(portsFile, 'r') as file:
 				cmdOutput = file.read()
 
 			with open(LogsFile, 'a') as file:
@@ -313,15 +327,15 @@ class grep:
 		except Exception as e:
 			log.error("An error occured while trying to append grep result to log file '{0}': {1}.".format(LogsFile, e))
 
-		
 		message = "Task completed in {0}.".format(help.elapsedTime(start))
 		log.infoPickC(message, Fore.CYAN)
 
-		TopTcpPortsList = list(filter(bool, cmdOutput2.split('\n')))
+		portsList = list(filter(bool, cmdOutput2.split('\n')))
 		portsCounter = 0
 		openPortsDict = {}
 		allPorts = []
-		for line in TopTcpPortsList:
+
+		for line in portsList:
 			data = list(filter(bool, line.split(';')))
 			host = data[0]
 			ports = list(filter(bool, data[2].split(',')))
@@ -329,8 +343,8 @@ class grep:
 			portsCounter += len(ports)
 			openPortsDict[host] = ports
 
-		log.info("{0} open TCP ports detected on {1} hosts.".format(portsCounter, len(TopTcpPortsList)))
-		help.writeMD(md.genTopPorts(openPortsDict, numOfPorts), TopTcpPortsMDFile)
+		log.info("{0} open {1} ports detected on {2} hosts.".format(portsCounter, scanType, len(portsList)))
+		help.writeMD(md.genTopPorts(openPortsDict, numOfPorts, scanType), portsMDfile)
 
 		for host, ports in openPortsDict.items():
 			db.addTopTcpPort(host, ','.join(ports))
@@ -339,9 +353,9 @@ class grep:
 			allPorts[index] = int(re.sub(r"\(.*\)", "", allPorts[index]))
 		
 		uniquePorts = sorted(set(allPorts))
-		log.info("{0} unique open TCP ports: {1}".format(len(uniquePorts), ','.join(str(s) for s in uniquePorts)))
+		log.info("{0} unique open {1} ports: {2}".format(len(uniquePorts),scanType, ','.join(str(s) for s in uniquePorts)))
 		
-		with open(TopTcpPortsUniqueFile, 'w') as file:
+		with open(portsUniqueFile, 'w') as file:
 			file.write(','.join(str(s) for s in uniquePorts))
 
 		return cmdOutput
@@ -398,18 +412,25 @@ class grep:
 class fm:
 
 	@classmethod
-	def createProjectDirStructure(self, target, projName, workingDir, defaultTopTcpPorts):
-		global ProjectDir, LiveHostsDir, LogsDir, LogsFile, ReportDir, LiveHostsListFile, LiveHostsMDFile, DatabaseDir, DatabaseFile, CommandsDir, CommandsFile, TopTcpPortsDir, TopTcpPortsFile, TopTcpPortsMatrixFile, TopTcpPortsMDFile, TopTcpPortsUniqueFile
+	def createProjectDirStructure(self, target, projName, workingDir, defaultTopTcpPorts, defaultTopUdpPorts):
+		global ProjectDir, LiveHostsDir, LogsDir, LogsFile, ReportDir, LiveHostsListFile, LiveHostsMDFile 
+		global DatabaseDir, DatabaseFile, CommandsDir, CommandsFile
+		global TopTcpPortsDir, TopTcpPortsFile, TopTcpPortsMatrixFile, TopTcpPortsMDFile, TopTcpPortsUniqueFile
+		global TopUdpPortsDir, TopUdpPortsFile, TopUdpPortsMatrixFile, TopUdpPortsMDFile, TopUdpPortsUniqueFile
 
 		ProjectDir = os.path.join(workingDir, projName)
 		ScansDir = os.path.join(ProjectDir, 'scans')
+
 		DatabaseDir = os.path.join(ProjectDir, 'db')
-		DatabaseFile = os.path.join(DatabaseDir, "{0}-{1}.db".format(projName, datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+		DatabaseFile = os.path.join(DatabaseDir, "{0}-database-{1}-{2}.db".format(projName, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+
 		CommandsDir = os.path.join(ProjectDir, 'commands')
-		CommandsFile = os.path.join(CommandsDir, "{0}-{1}-commands-log.txt".format(projName, datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+		CommandsFile = os.path.join(CommandsDir, "{0}-commands-log-{1}-{2}.txt".format(projName, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 
 		LiveHostsDir = os.path.join(ScansDir, 'live-hosts', target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+		
 		TopTcpPortsDir = os.path.join(ScansDir, 'tcp', 'ports', "top-{0}".format(defaultTopTcpPorts), target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+		TopUdpPortsDir = os.path.join(ScansDir, 'udp', 'ports', "top-{0}".format(defaultTopUdpPorts), target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
 		LogsDir = os.path.join(ProjectDir, 'logs', target.replace('/', '_'))
 		LogsFile = os.path.join(LogsDir, "{0}-log-{1}-{2}.txt".format(projName, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
@@ -419,13 +440,21 @@ class fm:
 		LiveHostsListFile = os.path.join(ReportDir, "{0}-live-hosts-list-{1}-{2}.txt".format(projName, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 		LiveHostsMDFile = LiveHostsListFile.replace('.txt', '.md')
 
-		TopTcpPortsFile = os.path.join(ReportDir, "{0}-top-{1}-ports-{2}-{3}.txt".format(projName, defaultTopTcpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
-		TopTcpPortsMatrixFile = os.path.join(ReportDir, "{0}-top-{1}-ports-{2}-{3}-matrix.txt".format(projName, defaultTopTcpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+		TopTcpPortsFile = os.path.join(ReportDir, "{0}-top-{1}-tcp-ports-{2}-{3}.txt".format(projName, defaultTopTcpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+		TopUdpPortsFile = os.path.join(ReportDir, "{0}-top-{1}-udp-ports-{2}-{3}.txt".format(projName, defaultTopUdpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+
+		TopTcpPortsMatrixFile = os.path.join(ReportDir, "{0}-top-{1}-tcp-ports-{2}-{3}-matrix.txt".format(projName, defaultTopTcpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+		TopUdpPortsMatrixFile = os.path.join(ReportDir, "{0}-top-{1}-udp-ports-{2}-{3}-matrix.txt".format(projName, defaultTopUdpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+
 		TopTcpPortsMDFile = TopTcpPortsFile.replace('.txt', '.md')
-		TopTcpPortsUniqueFile = os.path.join(ReportDir, "{0}-top-{1}-ports-{2}-{3}-unique.txt".format(projName, defaultTopTcpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+		TopUdpPortsMDFile = TopUdpPortsFile.replace('.txt', '.md')
+
+		TopTcpPortsUniqueFile = os.path.join(ReportDir, "{0}-top-{1}-tcp-ports-{2}-{3}-unique.txt".format(projName, defaultTopTcpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+		TopUdpPortsUniqueFile = os.path.join(ReportDir, "{0}-top-{1}-udp-ports-{2}-{3}-unique.txt".format(projName, defaultTopUdpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 
 		Path(LiveHostsDir).mkdir(parents=True, exist_ok=True)
 		Path(TopTcpPortsDir).mkdir(parents=True, exist_ok=True)
+		Path(TopUdpPortsDir).mkdir(parents=True, exist_ok=True)
 		Path(LogsDir).mkdir(parents=True, exist_ok=True)
 		Path(ReportDir).mkdir(parents=True, exist_ok=True)
 		Path(DatabaseDir).mkdir(parents=True, exist_ok=True)
@@ -458,7 +487,7 @@ class log:
 
 	@classmethod
 	def debug(self, logStr):
-		log.write('Error', logStr, Fore.BLUE)
+		log.write('Debug', logStr, Fore.BLUE)
 
 	@classmethod
 	def write(self, logType, logStr, color):
@@ -511,13 +540,22 @@ class user:
 class scanner:
 
 	@classmethod
-	def topTcpPorts(self, projName, topports):
+	def topTcpPorts(self, projName, topports, exclude):
 		global TopTcpPortsDir
 
 		ips = db.getLiveHosts()
 		for host in ips:
 			log.info('Scanning target {0} for open Top {1} TCP ports.'.format(host[0], topports))
-			scanner.topPorts(projName, TopTcpPortsDir, host[0], topports)
+			scanner.topPorts(projName, TopTcpPortsDir, host[0], topports, 'TCP', exclude)
+
+	@classmethod
+	def topUdpPorts(self, projName, topports, exclude):
+		global TopUdpPortsDir
+
+		ips = db.getLiveHosts()
+		for host in ips:
+			log.info('Scanning target {0} for open Top {1} UDP ports.'.format(host[0], topports))
+			scanner.topPorts(projName, TopUdpPortsDir, host[0], topports, 'UDP', exclude)
 
 	@classmethod
 	def livehosts(self, projName, target, exclude):
@@ -559,16 +597,29 @@ class scanner:
 		return os.path.join(outputDir, nmapLogFilePrefix)
 
 	@classmethod
-	def topPorts(self, projName, outputDir, target, topports):
-		outputDir = scanner.generateNmapLogPrefix(projName, "top-tcp-ports-{0}-scan".format(topports), outputDir, target)
-		command = "nmap -sS -n -Pn -vv --top-ports {0} --reason --open -T4 -oA {1} {2}".format(topports, outputDir, target)
-		scanner.scan("Top {0} TCP Ports".format(topports), outputDir, command, target)
+	def topPorts(self, projName, outputDir, target, topports, scanType, exclude):
+		scanFlag=''
+		if scanType.lower() == 'tcp':
+			scanFlag = '-sS'
+		else:
+			scanFlag = '-sU'
+		outputDir = scanner.generateNmapLogPrefix(projName, "top-{0}-ports-{1}-scan".format(scanType,topports), outputDir, target)
+		
+		if exclude:
+			log.info('Excluding {0} hosts from scan.'.format(exclude))
+			command = "nmap {0} -n -Pn -vv --top-ports {1} --reason --open -T4 -oA {2} --exclude {3} {4}".format(
+				scanFlag,topports, outputDir, exclude, target)
+		else:
+			command = "nmap {0} -n -Pn -vv --top-ports {1} --reason --open -T4 -oA {2} {3}".format(scanFlag,topports, outputDir, target)
+
+		scanner.scan("Top {0} {1} Ports".format(topports,scanType), outputDir, command, target)
 
 	@classmethod
 	def liveHostsIcmpEcho(self, projName, outputDir, target, exclude):
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-icmp-echo-scan', outputDir, target.replace('/', '_'))
 		if exclude:
+			log.info('Excluding {0} hosts from scan.'.format(exclude))
 			command = "nmap -vv -n -sn -PE -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
 		else:
 			command = "nmap -vv -n -sn -PE -oA {0} {1}".format(outputDir, target)
@@ -580,6 +631,7 @@ class scanner:
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-tcp-ack-scan', outputDir, target.replace('/', '_'))
 		if exclude:
+			log.info('Excluding {0} hosts from scan.'.format(exclude))
 			command = "nmap -vv -n -sn -PA21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
 		else:
 			command = "nmap -vv -n -sn -PA21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} {1}".format(outputDir, target)
@@ -591,6 +643,7 @@ class scanner:
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-tcp-syn-scan', outputDir, target.replace('/', '_'))
 		if exclude:
+			log.info('Excluding {0} hosts from scan.'.format(exclude))
 			command = "nmap -vv -n -sn -PS21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
 		else:
 			command = "nmap -vv -n -sn -PS21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} {1}".format(outputDir, target)
@@ -602,6 +655,7 @@ class scanner:
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-sctp-scan', outputDir, target.replace('/', '_'))
 		if exclude:
+			log.info('Excluding {0} hosts from scan.'.format(exclude))
 			command = "nmap -vv -n -sn -PY132,2905 -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
 		else:
 			command = "nmap -vv -n -sn -PY132,2905 -oA {0} {1}".format(outputDir, target)
@@ -613,6 +667,7 @@ class scanner:
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-udp-scan', outputDir, target.replace('/', '_'))
 		if exclude:
+			log.info('Excluding {0} hosts from scan.'.format(exclude))
 			command = "nmap -vv -n -sn -PU53,67,68,69,123,135,137,138,139,161,162,445,500,514,520,631,1434,1600,4500,49152 -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
 		else:
 			command = "nmap -vv -n -sn -PU53,67,68,69,123,135,137,138,139,161,162,445,500,514,520,631,1434,1600,4500,49152 -oA {0} {1}".format(outputDir, target)
@@ -624,6 +679,7 @@ class scanner:
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-protocol-ping-scan', outputDir, target.replace('/', '_'))
 		if exclude:
+			log.info('Excluding {0} hosts from scan.'.format(exclude))
 			command = "nmap -vv -n -sn -PO -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
 		else:
 			command = "nmap -vv -n -sn -PO -oA {0} {1}".format(outputDir, target)
@@ -635,6 +691,7 @@ class scanner:
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-timestamp-scan', outputDir, target.replace('/', '_'))
 		if exclude:
+			log.info('Excluding {0} hosts from scan.'.format(exclude))
 			command = "nmap -vv -n -sn -PP -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
 		else:
 			command = "nmap -vv -n -sn -PP -oA {0} {1}".format(outputDir, target)
@@ -646,6 +703,7 @@ class scanner:
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-netmask-scan', outputDir, target.replace('/', '_'))
 		if exclude:
+			log.info('Excluding {0} hosts from scan.'.format(exclude))
 			command = "nmap -vv -n -sn -PM -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
 		else:
 			command = "nmap -vv -n -sn -PM -oA {0} {1}".format(outputDir, target)
@@ -657,6 +715,7 @@ class scanner:
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-top-tcp-100-scan', outputDir, target.replace('/', '_'))
 		if exclude:
+			log.info('Excluding {0} hosts from scan.'.format(exclude))
 			command = "nmap -vv -sS -n -Pn --top-ports 100 --reason --open -T4 -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
 		else:
 			command = "nmap -vv -sS -n -Pn --top-ports 100 --reason --open -T4 -oA {0} {1}".format(outputDir, target)
@@ -664,12 +723,12 @@ class scanner:
 
 
 	@classmethod
-	def scan(self, type, nmapLogFilePrefix, command, target):
+	def scan(self, scanType, nmapLogFilePrefix, command, target):
 		global LogsFile
 
 		nmapOutput = ''
 
-		log.info('Scan Type: {1}'.format(target, type))
+		log.info('Scan Type: {1}'.format(target, scanType))
 		log.debug('Command: {0}'.format(command))
 		log.info('Nmap Output')
 
@@ -680,7 +739,7 @@ class scanner:
 			log.writeCmdLog(command)
 
 		except Exception as e:
-			log.error("An error occured during nmap scan ({0}): {1}.".format(type, e))
+			log.error("An error occured during nmap scan ({0}): {1}.".format(scanType, e))
 
 		try:
 			
@@ -705,9 +764,10 @@ class scanner:
 def main(args,extra):
 	global LiveHostsList
 
-	defaultTopTcpPorts = 1000
+	defaultTopTcpPorts = args.top_tcp_ports
+	defaultTopUdpPorts = args.top_udp_ports
 
-	fm.createProjectDirStructure(args.target, args.project_name, args.working_dir, defaultTopTcpPorts)
+	fm.createProjectDirStructure(args.target, args.project_name, args.working_dir, defaultTopTcpPorts, defaultTopUdpPorts)
 	db.connect()
 
 	if not user.isRoot():
@@ -725,9 +785,13 @@ def main(args,extra):
 
 	grep.liveHosts(args.target)
 
-	scanner.topTcpPorts(args.project_name, defaultTopTcpPorts)
+	scanner.topTcpPorts(args.project_name, defaultTopTcpPorts, args.exclude)
 
-	grep.openPorts(args.target, defaultTopTcpPorts)
+	grep.openTcpPorts(args.target, defaultTopTcpPorts)
+
+	scanner.topUdpPorts(args.project_name, defaultTopUdpPorts, args.exclude)
+
+	grep.openUdpPorts(args.target, defaultTopUdpPorts)
 
 	db.disconnect()
 
@@ -742,7 +806,10 @@ if __name__ == '__main__':
 	parser.add_argument('-t', '--target', metavar='<host or IP range>', help='target IP or IP range', required=True)
 	parser.add_argument('-p', '--project-name', help='project name', required=True)
 	parser.add_argument('-w', '--working-dir', help='working directory', required=True)
+
 	parser.add_argument('--exclude', metavar='<host1[,host2][,host3],...>', help='exclude hosts/networks', required=False)
+	parser.add_argument('--top-tcp-ports', metavar='<number>', help='scan <number> most common TCP ports', required=False, default=1000)
+	parser.add_argument('--top-udp-ports', metavar='<number>', help='scan <number> most common UDP ports', required=False, default=1000)
 
 	args,extra = parser.parse_known_args()
 	main(args,extra)
