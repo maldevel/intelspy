@@ -33,7 +33,6 @@ pip3 install -r requirements.txt
 ### Usage
 
 ```
-
  ___               __        
   |  ._ _|_  _  | (_  ._     
  _|_ | | |_ (/_ | __) |_) \/ 
@@ -48,6 +47,7 @@ https://github.com/maldevel/intelspy
 
 usage: intelspy.py [-h] -t <host or IP range> -p PROJECT_NAME -w WORKING_DIR
                    [--exclude <host1[,host2][,host3],...>]
+                   [--top-tcp-ports <number>] [--top-udp-ports <number>]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -59,7 +59,10 @@ optional arguments:
                         working directory
   --exclude <host1[,host2][,host3],...>
                         exclude hosts/networks
-
+  --top-tcp-ports <number>
+                        scan <number> most common TCP ports
+  --top-udp-ports <number>
+                        scan <number> most common UDP ports
 ```
 
 ---
@@ -76,6 +79,10 @@ sudo python3 intelspy.py -t 192.168.10.0/24 -p MyProjectName -w /home/user/pt/pr
 
 ```
 sudo python3 intelspy.py -t 192.168.10.0/24 -p MyProjectName -w /home/user/pt/projects/ --exclude 192.168.10.9,192.168.10.254
+```
+
+```
+sudo python3 intelspy.py -t 192.168.10.0/24 -p MyProjectName -w /home/user/pt/projects/ --top-tcp-ports 2000 --top-udp-ports 500
 ```
 
 ---
