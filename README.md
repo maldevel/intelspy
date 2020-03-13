@@ -15,6 +15,7 @@ IntelSpy is a network intelligence spy tool which performs automated enumeration
 * Logs commands that were run.
 * Extracts important information in txt and markdown format.
 * Stores data to an SQLite database.
+* Generates HTML report.
 
 ---
 
@@ -23,9 +24,11 @@ IntelSpy is a network intelligence spy tool which performs automated enumeration
 * Python 3
 * colorama
 * nmap
+* pandoc
 
 ```
 pip3 install -r requirements.txt
+sudo apt install nmap pandoc
 ```
 
 ---
