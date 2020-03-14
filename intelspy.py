@@ -376,13 +376,13 @@ class grep:
 			#awk '{{printf \"Host: \" $1 \"\\nOpen ports: \" NF-1 \"\\n\"; $1=\"\"; for(i=2; i<=NF; i++) 
 			#{{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); 
 			#printf \"%s\\t%s\\n\", v[1], v[5]}}; a=\"\"; printf \"\\n\"; }}'| tee {1}""".format(gnmapFilesDir, portsFile)
-			command = "egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-|sed 's/Ignored.*//g' |sed 's/ /_/'| sed 's/, /,/g'| awk -v FS=_ '{{printf \"Host: \" $1 \"\\nOpen ports: \" NF \"\\n\"; $1=\"\"; for(i=2; i<=NF; i++){{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); printf \"%-10s%-20s%s\\n\", v[1], v[5], v[7]}}; a=\"\"; printf \"\\n\"; }}'| tee {1}".format(gnmapFilesDir, portsFile)
+			command = "egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-|sed 's/Ignored.*//g' |sed 's/ /_/'| sed 's/, /,/g'| awk -v FS=_ '{{printf \"Host: \" $1 \"\\n\"; $1=\"\"; for(i=2; i<=NF; i++){{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); printf \"%-10s%-20s%s\\n\", v[1], v[5], v[7]}}; a=\"\"; printf \"\\n\"; }}'| tee {1}".format(gnmapFilesDir, portsFile)
 
 			#commandMatrix = """egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-| sed 's/Ignored.*//g' | 
 			#awk '{{printf $1 \";\" NF-1 \";\"; $1=\"\"; for(i=2; i<=NF; i++) {{ a=a\"\"$i; }}; 
 			#split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); 
 			#printf \"%s(%s),\", v[1], v[5]}}; a=\"\"; printf \"\\n\"; }}'> {1}""".format(gnmapFilesDir, TopTcpPortsMatrixFile)
-			commandMatrix = "egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-|sed 's/Ignored.*//g' |sed 's/ /_/'| sed 's/, /,/g'| awk -v FS=_ '{{printf $1 \";\" NF \";\"; $1=\"\"; for(i=2; i<=NF; i++){{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); printf \"%s(%s)[%s],\", v[1], v[5], v[7]}}; a=\"\"; printf \"\\n\"; }}'> {1}".format(gnmapFilesDir, TopTcpPortsMatrixFile)
+			commandMatrix = "egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-|sed 's/Ignored.*//g' |sed 's/ /_/'| sed 's/, /,/g'| awk -v FS=_ '{{printf $1 \";\"; $1=\"\"; for(i=2; i<=NF; i++){{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); printf \"%s(%s)[%s],\", v[1], v[5], v[7]}}; a=\"\"; printf \"\\n\"; }}'> {1}".format(gnmapFilesDir, TopTcpPortsMatrixFile)
 
 			log.info('Hosts with Top {0} {1} ports open({2}).'.format(numOfPorts,scanType,target))
 			log.debug('Command: {0}'.format(command))
@@ -425,12 +425,12 @@ class grep:
 		for line in portsList:
 			data = list(filter(bool, line.split(';')))
 			host = data[0]
-			ports = list(filter(bool, data[2].split(',')))
+			ports = list(filter(bool, data[1].split(',')))
 			allPorts += ports
 			portsCounter += len(ports)
 			openPortsDict[host] = ports
 
-		log.info("{0} open {1} ports detected on {2} hosts.".format(portsCounter, scanType, len(portsList)))
+		log.info("{0} open {1} ports found on {2} hosts.".format(portsCounter, scanType, len(portsList)))
 		help.writeMD(md.genTopPorts(openPortsDict, numOfPorts, scanType), portsMDfile)
 		help.appendMD(md.genTopPorts(openPortsDict, numOfPorts, scanType), FinalReportMDFile)
 
@@ -465,7 +465,7 @@ class grep:
 			gnmapFilesDir = os.path.join(LiveHostsDir, '*.gnmap')
 			command = "cat {0} | grep 'Status: Up' | cut -d ' ' -f2 | sort -V | uniq | tee {1}".format(gnmapFilesDir, LiveHostsListFile)
 			
-			log.info('Live hosts of target {0}.'.format(target))
+			log.info('Target {0} Live hosts.'.format(target))
 			log.debug('Command: {0}'.format(command))
 			log.info('Output')
 
@@ -491,7 +491,7 @@ class grep:
 		log.infoPickC(message, Fore.CYAN)
 
 		LiveHostsList = list(filter(bool, cmdOutput.split('\n')))
-		log.info("{0} live hosts detected.".format(len(LiveHostsList)))
+		log.info("{0} live hosts found.".format(len(LiveHostsList)))
 
 		help.writeMD(md.genLiveHosts(LiveHostsList), LiveHostsMDFile)
 		help.appendMD(md.genLiveHosts(LiveHostsList), FinalReportMDFile)
@@ -646,6 +646,8 @@ class log:
 
 		return
 
+
+
 #####################################################################################################################
 class user:
 
@@ -662,53 +664,53 @@ class user:
 class scanner:
 
 	@classmethod
-	def topTcpPorts(self, projName, topports, exclude):
+	def topTcpPorts(self, projName, topports, exclude,speed):
 		global TopTcpPortsDir
 
 		ips = db.getLiveHosts()
 		for host in ips:
-			log.info('Scanning target {0} for open Top {1} TCP ports.'.format(host[0], topports))
-			scanner.topPorts(projName, TopTcpPortsDir, host[0], topports, 'TCP', exclude)
+			log.info('Scanning target {0}'.format(host[0]))
+			scanner.topPorts(projName, TopTcpPortsDir, host[0], topports, 'TCP', exclude,speed)
 
 	@classmethod
-	def topUdpPorts(self, projName, topports, exclude):
+	def topUdpPorts(self, projName, topports, exclude,speed):
 		global TopUdpPortsDir
 
 		ips = db.getLiveHosts()
 		for host in ips:
-			log.info('Scanning target {0} for open Top {1} UDP ports.'.format(host[0], topports))
-			scanner.topPorts(projName, TopUdpPortsDir, host[0], topports, 'UDP', exclude)
+			log.info('Scanning target {0}'.format(host[0]))
+			scanner.topPorts(projName, TopUdpPortsDir, host[0], topports, 'UDP', exclude,speed)
 
 	@classmethod
-	def livehosts(self, projName, target, exclude):
+	def livehosts(self, projName, target, exclude,speed):
 		global LiveHostsDir
 
-		log.info('Scanning target {0} for live hosts.'.format(target))
-		scanner.liveHostsIcmpEcho(projName, LiveHostsDir, target, exclude)
+		log.info('Scanning target {0}'.format(target))
+		scanner.liveHostsIcmpEcho(projName, LiveHostsDir, target, exclude,speed)
 
-		log.info('Scanning target {0} for live hosts.'.format(target))
-		scanner.liveHostsTcpAck(projName, LiveHostsDir, target, exclude)
+		log.info('Scanning target {0}'.format(target))
+		scanner.liveHostsTcpAck(projName, LiveHostsDir, target, exclude,speed)
 
-		log.info('Scanning target {0} for live hosts.'.format(target))
-		scanner.liveHostsTcpSyn(projName, LiveHostsDir, target, exclude)
+		log.info('Scanning target {0}'.format(target))
+		scanner.liveHostsTcpSyn(projName, LiveHostsDir, target, exclude,speed)
 
-		log.info('Scanning target {0} for live hosts.'.format(target))
-		scanner.liveHostsSctp(projName, LiveHostsDir, target, exclude)
+		log.info('Scanning target {0}'.format(target))
+		scanner.liveHostsSctp(projName, LiveHostsDir, target, exclude,speed)
 
-		log.info('Scanning target {0} for live hosts.'.format(target))
-		scanner.liveHostsUdp(projName, LiveHostsDir, target, exclude)
+		log.info('Scanning target {0}'.format(target))
+		scanner.liveHostsUdp(projName, LiveHostsDir, target, exclude,speed)
 
-		log.info('Scanning target {0} for live hosts.'.format(target))
-		scanner.liveHostsProtocolPing(projName, LiveHostsDir, target, exclude)
+		log.info('Scanning target {0}'.format(target))
+		scanner.liveHostsProtocolPing(projName, LiveHostsDir, target, exclude,speed)
 
-		log.info('Scanning target {0} for live hosts.'.format(target))
-		scanner.liveHostsTimestamp(projName, LiveHostsDir, target, exclude)
+		log.info('Scanning target {0}'.format(target))
+		scanner.liveHostsTimestamp(projName, LiveHostsDir, target, exclude,speed)
 
-		log.info('Scanning target {0} for live hosts.'.format(target))
-		scanner.liveHostsNetmask(projName, LiveHostsDir, target, exclude)
+		log.info('Scanning target {0}'.format(target))
+		scanner.liveHostsNetmask(projName, LiveHostsDir, target, exclude,speed)
 
-		log.info('Scanning target {0} for live hosts.'.format(target))
-		scanner.liveHostsTopTcp100(projName, LiveHostsDir, target, exclude)
+		log.info('Scanning target {0}'.format(target))
+		scanner.liveHostsTopTcp100(projName, LiveHostsDir, target, exclude,speed)
 
 
 	@classmethod
@@ -720,7 +722,7 @@ class scanner:
 		return os.path.join(outputDir, nmapLogFilePrefix)
 
 	@classmethod
-	def topPorts(self, projName, outputDir, target, topports, scanType, exclude):
+	def topPorts(self, projName, outputDir, target, topports, scanType, exclude, speed):
 		scanFlag=''
 		if scanType.lower() == 'tcp':
 			scanFlag = '-sS'
@@ -730,125 +732,118 @@ class scanner:
 		
 		if exclude:
 			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap {0} -sV -n -Pn -vv --top-ports {1} --reason --open -T4 -oA {2} --exclude {3} {4}".format(
-				scanFlag,topports, outputDir, exclude, target)
+			command = "nmap {0} -sV -n -Pn -vv --top-ports {1} --reason --open -T{2} -oA {3} --exclude {4} {5}".format(
+				scanFlag,topports, speed,outputDir, exclude, target)
 		else:
-			command = "nmap {0} -sV -n -Pn -vv --top-ports {1} --reason --open -T4 -oA {2} {3}".format(scanFlag,topports, outputDir, target)
+			command = "nmap {0} -sV -n -Pn -vv --top-ports {1} --reason --open -T{2} -oA {3} {4}".format(scanFlag,topports, speed,outputDir, target)
 
-		scanner.scan("Top {0} {1} Ports".format(topports,scanType), outputDir, command, target)
+		scanner.scan("Top {0} {1} Ports detection".format(topports,scanType), outputDir, command, target)
 
 	@classmethod
-	def liveHostsIcmpEcho(self, projName, outputDir, target, exclude):
+	def liveHostsIcmpEcho(self, projName, outputDir, target, exclude, speed):
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-icmp-echo-scan', outputDir, target.replace('/', '_'))
 		if exclude:
 			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -n -sn -PE -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
+			command = "nmap -vv -n -sn -PE -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
 		else:
-			command = "nmap -vv -n -sn -PE -oA {0} {1}".format(outputDir, target)
-		scanner.scan('ICMP echo', outputDir, command, target)
-
+			command = "nmap -vv -n -sn -PE -T{0} -oA {1} {2}".format(speed,outputDir, target)
+		scanner.scan('ICMP echo Live Hosts detection', outputDir, command, target)
 
 	@classmethod
-	def liveHostsTcpAck(self, projName, outputDir, target, exclude):
+	def liveHostsTcpAck(self, projName, outputDir, target, exclude, speed):
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-tcp-ack-scan', outputDir, target.replace('/', '_'))
 		if exclude:
 			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = """nmap -vv -n -sn -PA21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,
-			465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} --exclude {1} {2}""".format(outputDir, exclude, target)
+			command = "nmap -vv -n -sn -PA21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
 		else:
-			command = """nmap -vv -n -sn -PA21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,
-			465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} {1}""".format(outputDir, target)
-		scanner.scan('TCP ACK', outputDir, command, target)
+			command = "nmap -vv -n -sn -PA21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -T{0} -oA {1} {2}".format(speed,outputDir, target)
+		scanner.scan('TCP ACK Live Hosts detection', outputDir, command, target)
 
 
 	@classmethod
-	def liveHostsTcpSyn(self, projName, outputDir, target, exclude):
+	def liveHostsTcpSyn(self, projName, outputDir, target, exclude, speed):
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-tcp-syn-scan', outputDir, target.replace('/', '_'))
 		if exclude:
 			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = """nmap -vv -n -sn -PS21,22,23,25,53,80,88,110,111,135,139,143,199,
-			443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} --exclude {1} {2}""".format(outputDir, exclude, target)
+			command = "nmap -vv -n -sn -PS21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
 		else:
-			command = """nmap -vv -n -sn -PS21,22,23,25,53,80,88,110,111,135,139,143,199,
-			443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -oA {0} {1}""".format(outputDir, target)
-		scanner.scan('TCP SYN', outputDir, command, target)
+			command = "nmap -vv -n -sn -PS21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -T{0} -oA {1} {2}".format(speed,outputDir, target)
+		scanner.scan('TCP SYN Live Hosts detection', outputDir, command, target)
 
 
 	@classmethod
-	def liveHostsSctp(self, projName, outputDir, target, exclude):
+	def liveHostsSctp(self, projName, outputDir, target, exclude, speed):
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-sctp-scan', outputDir, target.replace('/', '_'))
 		if exclude:
 			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -n -sn -PY132,2905 -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
+			command = "nmap -vv -n -sn -PY132,2905 -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
 		else:
-			command = "nmap -vv -n -sn -PY132,2905 -oA {0} {1}".format(outputDir, target)
-		scanner.scan('SCTP', outputDir, command, target)
+			command = "nmap -vv -n -sn -PY132,2905 -T{0} -oA {1} {2}".format(speed,outputDir, target)
+		scanner.scan('SCTP Live Hosts detection', outputDir, command, target)
 
 
 	@classmethod
-	def liveHostsUdp(self, projName, outputDir, target, exclude):
+	def liveHostsUdp(self, projName, outputDir, target, exclude, speed):
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-udp-scan', outputDir, target.replace('/', '_'))
 		if exclude:
 			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = """nmap -vv -n -sn -PU53,67,68,69,123,135,137,138,139,161,162,
-			445,500,514,520,631,1434,1600,4500,49152 -oA {0} --exclude {1} {2}""".format(outputDir, exclude, target)
+			command = "nmap -vv -n -sn -PU53,67,68,69,123,135,137,138,139,161,162,445,500,514,520,631,1434,1600,4500,49152 -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
 		else:
-			command = """nmap -vv -n -sn -PU53,67,68,69,123,135,137,138,139,161,162,
-			445,500,514,520,631,1434,1600,4500,49152 -oA {0} {1}""".format(outputDir, target)
-		scanner.scan('UDP', outputDir, command, target)
+			command = "nmap -vv -n -sn -PU53,67,68,69,123,135,137,138,139,161,162,445,500,514,520,631,1434,1600,4500,49152 -T{0} -oA {1} {2}".format(speed,outputDir, target)
+		scanner.scan('UDP Live Hosts detection', outputDir, command, target)
 
 
 	@classmethod
-	def liveHostsProtocolPing(self, projName, outputDir, target, exclude):
+	def liveHostsProtocolPing(self, projName, outputDir, target, exclude, speed):
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-protocol-ping-scan', outputDir, target.replace('/', '_'))
 		if exclude:
 			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -n -sn -PO -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
+			command = "nmap -vv -n -sn -PO -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
 		else:
-			command = "nmap -vv -n -sn -PO -oA {0} {1}".format(outputDir, target)
-		scanner.scan('Protocol Ping', outputDir, command, target)
+			command = "nmap -vv -n -sn -PO -T{0} -oA {1} {2}".format(speed,outputDir, target)
+		scanner.scan('Protocol Ping Live Hosts detection', outputDir, command, target)
 
 
 	@classmethod
-	def liveHostsTimestamp(self, projName, outputDir, target, exclude):
+	def liveHostsTimestamp(self, projName, outputDir, target, exclude, speed):
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-timestamp-scan', outputDir, target.replace('/', '_'))
 		if exclude:
 			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -n -sn -PP -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
+			command = "nmap -vv -n -sn -PP -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
 		else:
-			command = "nmap -vv -n -sn -PP -oA {0} {1}".format(outputDir, target)
-		scanner.scan('Timestamp', outputDir, command, target)
+			command = "nmap -vv -n -sn -PP -T{0} -oA {1} {2}".format(speed,outputDir, target)
+		scanner.scan('Timestamp Live Hosts detection', outputDir, command, target)
 
 
 	@classmethod
-	def liveHostsNetmask(self, projName, outputDir, target, exclude):
+	def liveHostsNetmask(self, projName, outputDir, target, exclude, speed):
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-netmask-scan', outputDir, target.replace('/', '_'))
 		if exclude:
 			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -n -sn -PM -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
+			command = "nmap -vv -n -sn -PM -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
 		else:
-			command = "nmap -vv -n -sn -PM -oA {0} {1}".format(outputDir, target)
-		scanner.scan('Netmask', outputDir, command, target)
+			command = "nmap -vv -n -sn -PM -T{0} -oA {1} {2}".format(speed,outputDir, target)
+		scanner.scan('Netmask Live Hosts detection', outputDir, command, target)
 
 
 	@classmethod
-	def liveHostsTopTcp100(self, projName, outputDir, target, exclude):
+	def liveHostsTopTcp100(self, projName, outputDir, target, exclude,speed):
 
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-top-tcp-100-scan', outputDir, target.replace('/', '_'))
 		if exclude:
 			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -sS -sV -n -Pn --top-ports 100 --reason --open -T4 -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
+			command = "nmap -vv -sS -sV -n -Pn --top-ports 100 --reason --open -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
 		else:
-			command = "nmap -vv -sS -sV -n -Pn --top-ports 100 --reason --open -T4 -oA {0} {1}".format(outputDir, target)
-		scanner.scan('Top 100 TCP Ports', outputDir, command, target)
+			command = "nmap -vv -sS -sV -n -Pn --top-ports 100 --reason --open -T{0} -oA {1} {2}".format(speed,outputDir, target)
+		scanner.scan('Top 100 TCP Ports Live Hosts detection', outputDir, command, target)
 
 
 	@classmethod
@@ -857,7 +852,7 @@ class scanner:
 
 		nmapOutput = ''
 
-		log.info('Scan Type: {1}'.format(target, scanType))
+		log.info('Running service {1}'.format(target, scanType))
 		log.debug('Command: {0}'.format(command))
 		log.info('Nmap Output')
 
@@ -921,17 +916,17 @@ def main(args,extra):
 		log.info("Excluding: {0}.".format(args.exclude))
 
 	if not args.analyze:
-		scanner.livehosts(args.project_name, args.target, args.exclude)
+		scanner.livehosts(args.project_name, args.target, args.exclude,args.speed)
 
 	grep.liveHosts(args.target)
 
 	if not args.analyze:
-		scanner.topTcpPorts(args.project_name, defaultTopTcpPorts, args.exclude)
+		scanner.topTcpPorts(args.project_name, defaultTopTcpPorts, args.exclude,args.speed)
 
 	grep.openTcpPorts(args.target, defaultTopTcpPorts)
 
 	if not args.analyze:
-		scanner.topUdpPorts(args.project_name, defaultTopUdpPorts, args.exclude)
+		scanner.topUdpPorts(args.project_name, defaultTopUdpPorts, args.exclude,args.speed)
 
 	grep.openUdpPorts(args.target, defaultTopUdpPorts)
 
@@ -952,10 +947,11 @@ if __name__ == '__main__':
 	parser.add_argument('-p', '--project-name', help='project name', required=True)
 	parser.add_argument('-w', '--working-dir', help='working directory', required=True)
 
+	parser.add_argument('-s','--speed', help='0-5, set timing template (higher is faster) (default: 4)', required=False, default=4)
 	parser.add_argument('--analyze', metavar='<datetime>', help='analyze results, no scan (e.g. 2020-03-14_18-07-32)', required=False, default=False)
 	parser.add_argument('--exclude', metavar='<host1[,host2][,host3],...>', help='exclude hosts/networks', required=False)
-	parser.add_argument('--top-tcp-ports', metavar='<number>', help='scan <number> most common TCP ports', required=False, default=1000)
-	parser.add_argument('--top-udp-ports', metavar='<number>', help='scan <number> most common UDP ports', required=False, default=1000)
+	parser.add_argument('--top-tcp-ports', metavar='<number>', help='scan <number> most common TCP ports (default: 1000)', required=False, default=1000)
+	parser.add_argument('--top-udp-ports', metavar='<number>', help='scan <number> most common UDP ports (default: 1000)', required=False, default=1000)
 
 	args,extra = parser.parse_known_args()
 	main(args,extra)
