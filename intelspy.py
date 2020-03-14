@@ -77,6 +77,7 @@ TopTcpPortsMatrixFile = ''
 TopUdpPortsMatrixFile = ''
 TopTcpPortsMDFile = ''
 TopUdpPortsMDFile = ''
+LiveHostsUniqueFile = ''
 TopTcpPortsUniqueFile = ''
 TopUdpPortsUniqueFile = ''
 FinalReportMDFile = ''
@@ -127,14 +128,15 @@ class report:
 #####################################################################################################################
 class db:
 	@classmethod
-	def connect(self):
+	def connect(self, analyze):
 		global DatabaseFile, DbConnection
 
 		try:
 			DbConnection = sqlite3.connect(DatabaseFile)
-			db.createLiveHostsTbl()
-			db.createTopTcpPortsTbl()
-			db.createTopUdpPortsTbl()
+			if not analyze:
+				db.createLiveHostsTbl()
+				db.createTopTcpPortsTbl()
+				db.createTopUdpPortsTbl()
 
 			log.info('Database file {0}.'.format(DatabaseFile))
 		except Exception as e:
@@ -267,6 +269,12 @@ class md:
 		data += "---\n\n"
 		return data
 
+	@classmethod
+	def getUniqueHosts(self, hosts):
+		data = "## Unique Live Hosts\n\n"
+		data += "* {0}\n\n".format(hosts)
+		data += "---\n\n"
+		return data
 
 
 #####################################################################################################################
@@ -448,7 +456,7 @@ class grep:
 
 	@classmethod
 	def liveHosts(self, target):
-		global LiveHostsDir, LiveHostsListFile, LogsFile, LiveHostsMDFile
+		global LiveHostsDir, LiveHostsListFile, LogsFile, LiveHostsMDFile,LiveHostsUniqueFile
 		
 		cmdOutput = ''
 
@@ -488,6 +496,13 @@ class grep:
 		help.writeMD(md.genLiveHosts(LiveHostsList), LiveHostsMDFile)
 		help.appendMD(md.genLiveHosts(LiveHostsList), FinalReportMDFile)
 
+		hostscommalist = ','.join(str(s) for s in LiveHostsList)
+		log.info("Unique Live Hosts: {0}".format(hostscommalist))
+		help.appendMD(md.getUniqueHosts(hostscommalist), FinalReportMDFile)
+
+		with open(LiveHostsUniqueFile, 'w') as file:
+			file.write(hostscommalist)
+
 		for host in LiveHostsList:
 			db.addLiveHost(host)
 
@@ -499,12 +514,12 @@ class grep:
 class fm:
 
 	@classmethod
-	def createProjectDirStructure(self, target, projName, workingDir, defaultTopTcpPorts, defaultTopUdpPorts):
+	def createProjectDirStructure(self, target, projName, workingDir, defaultTopTcpPorts, defaultTopUdpPorts, analyze):
 		global ProjectDir, LiveHostsDir, LogsDir, LogsFile, ReportDir, LiveHostsListFile, LiveHostsMDFile 
 		global DatabaseDir, DatabaseFile, CommandsDir, CommandsFile
 		global TopTcpPortsDir, TopTcpPortsFile, TopTcpPortsMatrixFile, TopTcpPortsMDFile, TopTcpPortsUniqueFile
 		global TopUdpPortsDir, TopUdpPortsFile, TopUdpPortsMatrixFile, TopUdpPortsMDFile, TopUdpPortsUniqueFile
-		global FinalReportMDFile, FinalReportHTMLFile,CurrentDateTime
+		global FinalReportMDFile, FinalReportHTMLFile,CurrentDateTime,LiveHostsUniqueFile
 
 		ProjectDir = os.path.join(workingDir, projName)
 		ScansDir = os.path.join(ProjectDir, 'scans')
@@ -536,6 +551,9 @@ class fm:
 
 		LiveHostsListFile = os.path.join(ReportDir, "{0}-live-hosts-list-{1}-{2}.txt".format(projName, target.replace('/', '_'), 
 			CurrentDateTime))
+		LiveHostsUniqueFile = os.path.join(ReportDir, "{0}-live-hosts-list-{1}-{2}-unique.txt".format(projName, target.replace('/', '_'), 
+			CurrentDateTime))
+
 		LiveHostsMDFile = LiveHostsListFile.replace('.txt', '.md')
 
 		TopTcpPortsFile = os.path.join(ReportDir, "{0}-top-{1}-tcp-ports-{2}-{3}.txt".format(projName, defaultTopTcpPorts, 
@@ -556,15 +574,15 @@ class fm:
 		TopUdpPortsUniqueFile = os.path.join(ReportDir, "{0}-top-{1}-udp-ports-{2}-{3}-unique.txt".format(projName, 
 			defaultTopUdpPorts, target.replace('/', '_'), CurrentDateTime))
 
-		Path(LiveHostsDir).mkdir(parents=True, exist_ok=True)
-		Path(TopTcpPortsDir).mkdir(parents=True, exist_ok=True)
-		Path(TopUdpPortsDir).mkdir(parents=True, exist_ok=True)
-		Path(LogsDir).mkdir(parents=True, exist_ok=True)
-		Path(ReportDir).mkdir(parents=True, exist_ok=True)
-		Path(DatabaseDir).mkdir(parents=True, exist_ok=True)
-		Path(CommandsDir).mkdir(parents=True, exist_ok=True)
-
-		log.info("Creating project directory structure '{0}'.".format(ProjectDir))		
+		if not analyze:
+			Path(LiveHostsDir).mkdir(parents=True, exist_ok=True)
+			Path(TopTcpPortsDir).mkdir(parents=True, exist_ok=True)
+			Path(TopUdpPortsDir).mkdir(parents=True, exist_ok=True)
+			Path(LogsDir).mkdir(parents=True, exist_ok=True)
+			Path(ReportDir).mkdir(parents=True, exist_ok=True)
+			Path(DatabaseDir).mkdir(parents=True, exist_ok=True)
+			Path(CommandsDir).mkdir(parents=True, exist_ok=True)
+			log.info("Creating project directory structure '{0}'.".format(ProjectDir))		
 
 
 
@@ -876,19 +894,23 @@ def main(args,extra):
 	global LiveHostsList,FinalReportMDFile,FinalReportHTMLFile,CurrentDateTime
 
 	start = time.time()
-	CurrentDateTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+	if args.analyze:
+		CurrentDateTime = args.analyze
+	else:
+		CurrentDateTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 	defaultTopTcpPorts = args.top_tcp_ports
 	defaultTopUdpPorts = args.top_udp_ports
 
-	fm.createProjectDirStructure(args.target, args.project_name, args.working_dir, defaultTopTcpPorts, defaultTopUdpPorts)
+	fm.createProjectDirStructure(args.target, args.project_name, args.working_dir, defaultTopTcpPorts, defaultTopUdpPorts, args.analyze)
 
 	if not user.isRoot():
 		exit(1)
 
 	help.writeMD(md.finalReportHeaders(args.target), FinalReportMDFile)
 
-	db.connect()
+	db.connect(args.analyze)
 
 	if pt.setMode(args.target) == True:
 		log.info('Penetration Test Type: Internal.')
@@ -898,15 +920,18 @@ def main(args,extra):
 	if args.exclude:
 		log.info("Excluding: {0}.".format(args.exclude))
 
-	scanner.livehosts(args.project_name, args.target, args.exclude)
+	if not args.analyze:
+		scanner.livehosts(args.project_name, args.target, args.exclude)
 
 	grep.liveHosts(args.target)
 
-	scanner.topTcpPorts(args.project_name, defaultTopTcpPorts, args.exclude)
+	if not args.analyze:
+		scanner.topTcpPorts(args.project_name, defaultTopTcpPorts, args.exclude)
 
 	grep.openTcpPorts(args.target, defaultTopTcpPorts)
 
-	scanner.topUdpPorts(args.project_name, defaultTopUdpPorts, args.exclude)
+	if not args.analyze:
+		scanner.topUdpPorts(args.project_name, defaultTopUdpPorts, args.exclude)
 
 	grep.openUdpPorts(args.target, defaultTopUdpPorts)
 
@@ -927,6 +952,7 @@ if __name__ == '__main__':
 	parser.add_argument('-p', '--project-name', help='project name', required=True)
 	parser.add_argument('-w', '--working-dir', help='working directory', required=True)
 
+	parser.add_argument('--analyze', metavar='<datetime>', help='analyze results, no scan (e.g. 2020-03-14_18-07-32)', required=False, default=False)
 	parser.add_argument('--exclude', metavar='<host1[,host2][,host3],...>', help='exclude hosts/networks', required=False)
 	parser.add_argument('--top-tcp-ports', metavar='<number>', help='scan <number> most common TCP ports', required=False, default=1000)
 	parser.add_argument('--top-udp-ports', metavar='<number>', help='scan <number> most common UDP ports', required=False, default=1000)
