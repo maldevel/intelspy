@@ -49,6 +49,7 @@ https://github.com/maldevel/intelspy
 
 
 usage: intelspy.py [-h] -t <host or IP range> -p PROJECT_NAME -w WORKING_DIR
+                   [--analyze <datetime>]
                    [--exclude <host1[,host2][,host3],...>]
                    [--top-tcp-ports <number>] [--top-udp-ports <number>]
 
@@ -60,6 +61,7 @@ optional arguments:
                         project name
   -w WORKING_DIR, --working-dir WORKING_DIR
                         working directory
+  --analyze <datetime>  analyze results, no scan (e.g. 2020-03-14_18-07-32)
   --exclude <host1[,host2][,host3],...>
                         exclude hosts/networks
   --top-tcp-ports <number>
@@ -86,6 +88,10 @@ sudo python3 intelspy.py -t 192.168.10.0/24 -p MyProjectName -w /home/user/pt/pr
 
 ```
 sudo python3 intelspy.py -t 192.168.10.0/24 -p MyProjectName -w /home/user/pt/projects/ --top-tcp-ports 2000 --top-udp-ports 500
+```
+
+```
+sudo python3 intelspy.py -t 192.168.1.0/24 -p home-network -w /media/data/Tools/Testing --top-tcp-ports 10 --top-udp-ports 10 --analyze 2020-03-14_18-07-32
 ```
 
 ---
