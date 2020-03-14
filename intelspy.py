@@ -81,6 +81,7 @@ TopTcpPortsUniqueFile = ''
 TopUdpPortsUniqueFile = ''
 FinalReportMDFile = ''
 FinalReportHTMLFile = ''
+CurrentDateTime = ''
 
 
 #####################################################################################################################
@@ -120,7 +121,6 @@ class report:
 
 		message = "Task completed in {0}.".format(help.elapsedTime(start))
 		log.infoPickC(message, Fore.CYAN)
-
 
 
 
@@ -346,17 +346,17 @@ class grep:
 	@classmethod
 	def openUdpPorts(self, target, numOfPorts):
 		global TopUdpPortsDir,TopUdpPortsFile, TopUdpPortsMDFile, TopUdpPortsUniqueFile, TopUdpPortsMatrixFile
-		grep.openPorts('UDP', target, numOfPorts, TopUdpPortsDir, TopUdpPortsFile, 
+		grep.openTopPortsAndServices('UDP', target, numOfPorts, TopUdpPortsDir, TopUdpPortsFile, 
 			TopUdpPortsMDFile, TopUdpPortsUniqueFile, TopUdpPortsMatrixFile)
 
 	@classmethod
 	def openTcpPorts(self, target, numOfPorts):
 		global TopTcpPortsDir,TopTcpPortsFile, TopTcpPortsMDFile, TopTcpPortsUniqueFile, TopTcpPortsMatrixFile
-		grep.openPorts('TCP', target, numOfPorts, TopTcpPortsDir, TopTcpPortsFile, 
+		grep.openTopPortsAndServices('TCP', target, numOfPorts, TopTcpPortsDir, TopTcpPortsFile, 
 			TopTcpPortsMDFile, TopTcpPortsUniqueFile, TopTcpPortsMatrixFile)
 
 	@classmethod
-	def openPorts(self, scanType, target, numOfPorts, path, portsFile, portsMDfile, portsUniqueFile, portsMatrixFile):
+	def openTopPortsAndServices(self, scanType, target, numOfPorts, path, portsFile, portsMDfile, portsUniqueFile, portsMatrixFile):
 		global LogsFile
 
 		cmdOutput = ''
@@ -364,16 +364,18 @@ class grep:
 		try:
 
 			gnmapFilesDir = os.path.join(path, '*.gnmap')
-			command = """egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-| sed 's/Ignored.*//g' | 
-			awk '{{printf \"Host: \" $1 \"\\nOpen ports: \" NF-1 \"\\n\"; $1=\"\"; for(i=2; i<=NF; i++) 
-			{{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); 
-			printf \"%s\\t%s\\n\", v[1], v[5]}}; a=\"\"; printf \"\\n\"; }}'| tee {1}""".format(gnmapFilesDir, portsFile)
+			#command = """egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-| sed 's/Ignored.*//g' | 
+			#awk '{{printf \"Host: \" $1 \"\\nOpen ports: \" NF-1 \"\\n\"; $1=\"\"; for(i=2; i<=NF; i++) 
+			#{{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); 
+			#printf \"%s\\t%s\\n\", v[1], v[5]}}; a=\"\"; printf \"\\n\"; }}'| tee {1}""".format(gnmapFilesDir, portsFile)
+			command = "egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-|sed 's/Ignored.*//g' |sed 's/ /_/'| sed 's/, /,/g'| awk -v FS=_ '{{printf \"Host: \" $1 \"\\nOpen ports: \" NF \"\\n\"; $1=\"\"; for(i=2; i<=NF; i++){{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); printf \"%-10s%-20s%s\\n\", v[1], v[5], v[7]}}; a=\"\"; printf \"\\n\"; }}'| tee {1}".format(gnmapFilesDir, portsFile)
 
-			commandMatrix = """egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-| sed 's/Ignored.*//g' | 
-			awk '{{printf $1 \";\" NF-1 \";\"; $1=\"\"; for(i=2; i<=NF; i++) {{ a=a\"\"$i; }}; 
-			split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); 
-			printf \"%s(%s),\", v[1], v[5]}}; a=\"\"; printf \"\\n\"; }}'> {1}""".format(gnmapFilesDir, TopTcpPortsMatrixFile)
-			
+			#commandMatrix = """egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-| sed 's/Ignored.*//g' | 
+			#awk '{{printf $1 \";\" NF-1 \";\"; $1=\"\"; for(i=2; i<=NF; i++) {{ a=a\"\"$i; }}; 
+			#split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); 
+			#printf \"%s(%s),\", v[1], v[5]}}; a=\"\"; printf \"\\n\"; }}'> {1}""".format(gnmapFilesDir, TopTcpPortsMatrixFile)
+			commandMatrix = "egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-|sed 's/Ignored.*//g' |sed 's/ /_/'| sed 's/, /,/g'| awk -v FS=_ '{{printf $1 \";\" NF \";\"; $1=\"\"; for(i=2; i<=NF; i++){{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); printf \"%s(%s)[%s],\", v[1], v[5], v[7]}}; a=\"\"; printf \"\\n\"; }}'> {1}".format(gnmapFilesDir, TopTcpPortsMatrixFile)
+
 			log.info('Hosts with Top {0} {1} ports open({2}).'.format(numOfPorts,scanType,target))
 			log.debug('Command: {0}'.format(command))
 			log.info('Output')
@@ -431,7 +433,7 @@ class grep:
 				db.addTopUdpPort(host, ','.join(ports))
 
 		for index, item in enumerate(allPorts):
-			allPorts[index] = int(re.sub(r"\(.*\)", "", allPorts[index]))
+			allPorts[index] = int(re.sub(r"\(.*", "", allPorts[index]))
 
 		uniquePorts = sorted(set(allPorts))
 		portscommalist = ','.join(str(s) for s in uniquePorts)
@@ -502,57 +504,57 @@ class fm:
 		global DatabaseDir, DatabaseFile, CommandsDir, CommandsFile
 		global TopTcpPortsDir, TopTcpPortsFile, TopTcpPortsMatrixFile, TopTcpPortsMDFile, TopTcpPortsUniqueFile
 		global TopUdpPortsDir, TopUdpPortsFile, TopUdpPortsMatrixFile, TopUdpPortsMDFile, TopUdpPortsUniqueFile
-		global FinalReportMDFile, FinalReportHTMLFile
+		global FinalReportMDFile, FinalReportHTMLFile,CurrentDateTime
 
 		ProjectDir = os.path.join(workingDir, projName)
 		ScansDir = os.path.join(ProjectDir, 'scans')
 
 		DatabaseDir = os.path.join(ProjectDir, 'db')
 		DatabaseFile = os.path.join(DatabaseDir, "{0}-database-{1}-{2}.db".format(projName, target.replace('/', '_'), 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+			CurrentDateTime))
 
 		CommandsDir = os.path.join(ProjectDir, 'commands')
 		CommandsFile = os.path.join(CommandsDir, "{0}-commands-log-{1}-{2}.txt".format(projName, target.replace('/', '_'), 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+			CurrentDateTime))
 
-		LiveHostsDir = os.path.join(ScansDir, 'live-hosts', target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+		LiveHostsDir = os.path.join(ScansDir, 'live-hosts', target.replace('/', '_'), CurrentDateTime)
 		
 		TopTcpPortsDir = os.path.join(ScansDir, 'tcp', 'ports', "top-{0}".format(defaultTopTcpPorts), target.replace('/', '_'), 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+			CurrentDateTime)
 		TopUdpPortsDir = os.path.join(ScansDir, 'udp', 'ports', "top-{0}".format(defaultTopUdpPorts), target.replace('/', '_'), 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+			CurrentDateTime)
 
 		LogsDir = os.path.join(ProjectDir, 'logs', target.replace('/', '_'))
 		LogsFile = os.path.join(LogsDir, "{0}-log-{1}-{2}.txt".format(projName, target.replace('/', '_'), 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+			CurrentDateTime))
 		
-		ReportDir = os.path.join(ProjectDir, 'report', target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+		ReportDir = os.path.join(ProjectDir, 'report', target.replace('/', '_'), CurrentDateTime)
 
 		FinalReportMDFile = os.path.join(ReportDir, "{0}-final-report-{1}-{2}.md".format(projName, target.replace('/', '_'), 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+			CurrentDateTime))
 		FinalReportHTMLFile = FinalReportMDFile.replace('.md', '.html')
 
 		LiveHostsListFile = os.path.join(ReportDir, "{0}-live-hosts-list-{1}-{2}.txt".format(projName, target.replace('/', '_'), 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+			CurrentDateTime))
 		LiveHostsMDFile = LiveHostsListFile.replace('.txt', '.md')
 
 		TopTcpPortsFile = os.path.join(ReportDir, "{0}-top-{1}-tcp-ports-{2}-{3}.txt".format(projName, defaultTopTcpPorts, 
-			target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+			target.replace('/', '_'), CurrentDateTime))
 		TopUdpPortsFile = os.path.join(ReportDir, "{0}-top-{1}-udp-ports-{2}-{3}.txt".format(projName, defaultTopUdpPorts, 
-			target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+			target.replace('/', '_'), CurrentDateTime))
 
 		TopTcpPortsMatrixFile = os.path.join(ReportDir, "{0}-top-{1}-tcp-ports-{2}-{3}-matrix.txt".format(projName, 
-			defaultTopTcpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+			defaultTopTcpPorts, target.replace('/', '_'), CurrentDateTime))
 		TopUdpPortsMatrixFile = os.path.join(ReportDir, "{0}-top-{1}-udp-ports-{2}-{3}-matrix.txt".format(projName, 
-			defaultTopUdpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+			defaultTopUdpPorts, target.replace('/', '_'), CurrentDateTime))
 
 		TopTcpPortsMDFile = TopTcpPortsFile.replace('.txt', '.md')
 		TopUdpPortsMDFile = TopUdpPortsFile.replace('.txt', '.md')
 
 		TopTcpPortsUniqueFile = os.path.join(ReportDir, "{0}-top-{1}-tcp-ports-{2}-{3}-unique.txt".format(projName, 
-			defaultTopTcpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+			defaultTopTcpPorts, target.replace('/', '_'), CurrentDateTime))
 		TopUdpPortsUniqueFile = os.path.join(ReportDir, "{0}-top-{1}-udp-ports-{2}-{3}-unique.txt".format(projName, 
-			defaultTopUdpPorts, target.replace('/', '_'), datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+			defaultTopUdpPorts, target.replace('/', '_'), CurrentDateTime))
 
 		Path(LiveHostsDir).mkdir(parents=True, exist_ok=True)
 		Path(TopTcpPortsDir).mkdir(parents=True, exist_ok=True)
@@ -693,8 +695,9 @@ class scanner:
 
 	@classmethod
 	def generateNmapLogPrefix(self, projName, prefix, outputDir, target):
+		global CurrentDateTime
 		nmapLogFilePrefix = "{0}-{1}-{2}-{3}".format(projName, prefix, target, 
-			datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+			CurrentDateTime)
 
 		return os.path.join(outputDir, nmapLogFilePrefix)
 
@@ -709,10 +712,10 @@ class scanner:
 		
 		if exclude:
 			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap {0} -n -Pn -vv --top-ports {1} --reason --open -T4 -oA {2} --exclude {3} {4}".format(
+			command = "nmap {0} -sV -n -Pn -vv --top-ports {1} --reason --open -T4 -oA {2} --exclude {3} {4}".format(
 				scanFlag,topports, outputDir, exclude, target)
 		else:
-			command = "nmap {0} -n -Pn -vv --top-ports {1} --reason --open -T4 -oA {2} {3}".format(scanFlag,topports, outputDir, target)
+			command = "nmap {0} -sV -n -Pn -vv --top-ports {1} --reason --open -T4 -oA {2} {3}".format(scanFlag,topports, outputDir, target)
 
 		scanner.scan("Top {0} {1} Ports".format(topports,scanType), outputDir, command, target)
 
@@ -824,9 +827,9 @@ class scanner:
 		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-top-tcp-100-scan', outputDir, target.replace('/', '_'))
 		if exclude:
 			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -sS -n -Pn --top-ports 100 --reason --open -T4 -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
+			command = "nmap -vv -sS -sV -n -Pn --top-ports 100 --reason --open -T4 -oA {0} --exclude {1} {2}".format(outputDir, exclude, target)
 		else:
-			command = "nmap -vv -sS -n -Pn --top-ports 100 --reason --open -T4 -oA {0} {1}".format(outputDir, target)
+			command = "nmap -vv -sS -sV -n -Pn --top-ports 100 --reason --open -T4 -oA {0} {1}".format(outputDir, target)
 		scanner.scan('Top 100 TCP Ports', outputDir, command, target)
 
 
@@ -870,9 +873,10 @@ class scanner:
 
 #####################################################################################################################
 def main(args,extra):
-	global LiveHostsList,FinalReportMDFile,FinalReportHTMLFile
+	global LiveHostsList,FinalReportMDFile,FinalReportHTMLFile,CurrentDateTime
 
 	start = time.time()
+	CurrentDateTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 	defaultTopTcpPorts = args.top_tcp_ports
 	defaultTopUdpPorts = args.top_udp_ports
