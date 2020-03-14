@@ -74,21 +74,31 @@ optional arguments:
 
 ### Usage Examples
 
+Simple scan
+
 ```
 sudo python3 intelspy.py -t 192.168.10.0/24 -p MyProjectName -w /home/user/pt/projects/
 ```
+
+Exclude one host
 
 ```
 sudo python3 intelspy.py -t 192.168.10.0/24 -p MyProjectName -w /home/user/pt/projects/ --exclude 192.168.10.9
 ```
 
+Exclude many hosts
+
 ```
 sudo python3 intelspy.py -t 192.168.10.0/24 -p MyProjectName -w /home/user/pt/projects/ --exclude 192.168.10.9,192.168.10.254
 ```
 
+Select the number of the Top TCP and Top UDP ports to scan
+
 ```
 sudo python3 intelspy.py -t 192.168.10.0/24 -p MyProjectName -w /home/user/pt/projects/ --top-tcp-ports 2000 --top-udp-ports 500
 ```
+
+Analyze previous results (Do not scan).
 
 ```
 sudo python3 intelspy.py -t 192.168.1.0/24 -p home-network -w /media/data/Tools/Testing --top-tcp-ports 10 --top-udp-ports 10 --analyze 2020-03-14_18-07-32
