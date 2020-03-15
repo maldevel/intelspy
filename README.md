@@ -75,15 +75,22 @@ https://pentest-labs.com/
 https://github.com/maldevel/intelspy
 
 
-usage: intelspy.py [-h] -t <host or IP range> -p PROJECT_NAME -w WORKING_DIR
+usage: intelspy.py [-h] [-ts TARGET_FILE] -p PROJECT_NAME -w WORKING_DIR
                    [--analyze <datetime>]
-                   [--exclude <host1[,host2][,host3],...>]
-                   [--top-tcp-ports <number>] [--top-udp-ports <number>]
+                   [--exclude <host1[,host2][,host3],...>] [-ct <number>]
+                   [-cs <number>] [--profile PROFILE_NAME]
+                   [--heartbeat HEARTBEAT] [-v]
+                   [targets [targets ...]]
+
+positional arguments:
+  targets               IP addresses (e.g. 10.0.0.1), CIDR notation (e.g.
+                        10.0.0.1/24), or resolvable hostnames (e.g.
+                        example.com) to scan.
 
 optional arguments:
   -h, --help            show this help message and exit
-  -t <host or IP range>, --target <host or IP range>
-                        target IP or IP range
+  -ts TARGET_FILE, --targets TARGET_FILE
+                        Read targets from file.
   -p PROJECT_NAME, --project-name PROJECT_NAME
                         project name
   -w WORKING_DIR, --working-dir WORKING_DIR
@@ -91,10 +98,19 @@ optional arguments:
   --analyze <datetime>  analyze results, no scan (e.g. 2020-03-14_18-07-32)
   --exclude <host1[,host2][,host3],...>
                         exclude hosts/networks
-  --top-tcp-ports <number>
-                        scan <number> most common TCP ports
-  --top-udp-ports <number>
-                        scan <number> most common UDP ports
+  -ct <number>, --concurrent-targets <number>
+                        The maximum number of target hosts to scan
+                        concurrently. Default: 5
+  -cs <number>, --concurrent-scans <number>
+                        The maximum number of scans to perform per target
+                        host. Default: 10
+  --profile PROFILE_NAME
+                        The port scanning profile to use (defined in port-
+                        scan-profiles.toml). Default: default
+  --heartbeat HEARTBEAT
+                        Specifies the heartbeat interval (in seconds) for task
+                        status messages. Default: 60
+  -v, --verbose         Enable verbose output. Repeat for more verbosity.
 ```
 
 ---
@@ -104,31 +120,49 @@ optional arguments:
 Scanning single target
 
 ```
-sudo python3 intelspy.py -t 192.168.10.0/24 -p MyProjectName -w /home/user/pt/projects/
+sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ 192.168.10.15
 ```
 
-Exclude one host
+Scanning a hostname
 
 ```
-sudo python3 intelspy.py -t 192.168.10.0/24 -p MyProjectName -w /home/user/pt/projects/ --exclude 192.168.10.9
+sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ example.com
 ```
 
-Exclude many hosts
+Scanning a network range(CIDR)
 
 ```
-sudo python3 intelspy.py -t 192.168.10.0/24 -p MyProjectName -w /home/user/pt/projects/ --exclude 192.168.10.9,192.168.10.254
+sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ 192.168.10.0/24
 ```
 
-Select the number of the Top TCP and Top UDP ports to scan
+Scanning multiple targets
 
 ```
-sudo python3 intelspy.py -t 192.168.10.0/24 -p MyProjectName -w /home/user/pt/projects/ --top-tcp-ports 2000 --top-udp-ports 500
+sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ 192.168.10.15 192.168.10.0/24 example.com
+```
+
+Scanning targets from file
+
+```
+sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ -ts /home/user/targets.txt
+```
+
+Excluding one host
+
+```
+sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ --exclude 192.168.10.9 192.168.10.0/24
+```
+
+Excluding many hosts
+
+```
+sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ --exclude 192.168.10.9,192.168.10.24 192.168.10.0/24
 ```
 
 Analyze previous results (Do not scan).
 
 ```
-sudo python3 intelspy.py -t 192.168.1.0/24 -p home-network -w /media/data/Tools/Testing --top-tcp-ports 10 --top-udp-ports 10 --analyze 2020-03-14_18-07-32
+sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ --analyze 2020-03-14_18-07-32 192.168.10.0/24
 ```
 
 ---
