@@ -4,13 +4,17 @@
 
 Perform automated network reconnaissance scans to gather network intelligence.
 
-IntelSpy is a network intelligence spy tool which performs automated enumeration of network services. It performs live hosts detection scans, port scans, services enumeration scans, web content scans, brute-force, detailed off-line exploits searches and more. The tool will also launch further enumeration scans for each detected service using a number of different tools.
+IntelSpy is a multi-threaded network intelligence spy tool which performs automated enumeration of network services. It performs live hosts detection scans, port scans, services enumeration scans, web content scans, brute-force, detailed off-line exploits searches and more. 
+
+The tool will also launch further enumeration scans for each detected service using a number of different tools.
 
 ---
 
 ### Features
 
-* Scans IP addresses and IP ranges (CIDR notation).
+* Scans multiple targets in the form of IP addresses, IP ranges (CIDR notation) and resolvable hostnames.
+* Can scan targets concurrently.
+* Customizable port scanning profiles and service enumeration commands.
 * Creates a directory structure for results gathering.
 * Logs commands that were run.
 * Extracts important information in txt and markdown format.
@@ -23,13 +27,36 @@ IntelSpy is a network intelligence spy tool which performs automated enumeration
 
 * Python 3
 * colorama
-* nmap
-* pandoc
+* toml (https://github.com/toml-lang/toml)
+* seclists
 
 ```
 pip3 install -r requirements.txt
-sudo apt install nmap pandoc
+sudo apt install seclists
 ```
+
+---
+
+### Additional Tools
+
+* curl
+* enum4linux
+* gobuster
+* nbtscan
+* nikto
+* nmap
+* onesixtyone
+* oscanner
+* smbclient
+* smbmap
+* smtp-user-enum
+* snmpwalk
+* sslscan
+* svwar
+* tnscmd10g
+* whatweb
+* wkhtmltoimage
+* pandoc
 
 ---
 
@@ -74,7 +101,7 @@ optional arguments:
 
 ### Usage Examples
 
-Simple scan
+Scanning single target
 
 ```
 sudo python3 intelspy.py -t 192.168.10.0/24 -p MyProjectName -w /home/user/pt/projects/

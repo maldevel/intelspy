@@ -23,66 +23,36 @@
 #    For more see the file 'LICENSE' for copying permission.
 
 
-# Created by @maldevel
-# Logisek
+# Created by @maldevel | Logisek
 # https://pentest-labs.com
 # intelspy.py Version 1.0
 # Released under GPL Version 3 License
 # March 2020
 
-
-import subprocess
-from subprocess import Popen, PIPE, STDOUT
-from datetime import datetime
+import atexit
 import argparse
-import os
-from datetime import timezone
-import socket
-import sys
-import shlex
-from pathlib import Path
+import asyncio
 import colorama
 from colorama import Fore, Style
-import time
+from concurrent.futures import ProcessPoolExecutor, as_completed, FIRST_COMPLETED
+from datetime import datetime
 import ipaddress
-import sqlite3
-from sqlite3 import Error
+import os
 import re
-
+import socket
+import string
+import sys
+import time
+import toml
+import termios
+from pathlib import Path
+from datetime import timezone
+import sqlite3
 
 
 #####################################################################################################################
 __version__ = 1.0
 
-EventID = 0
-ProjectDir = ''
-LiveHostsDir = ''
-LogsDir = ''
-LogsFile = ''
-ReportDir = ''
-LiveHostsListFile = ''
-InternalPTMode = False
-LiveHostsList = []
-LiveHostsMDFile = ''
-DatabaseDir = ''
-DatabaseFile = ''
-DbConnection = None
-CommandsDir = ''
-CommandsFile = ''
-TopTcpPortsDir = ''
-TopUdpPortsDir = ''
-TopTcpPortsFile = ''
-TopUdpPortsFile = ''
-TopTcpPortsMatrixFile = ''
-TopUdpPortsMatrixFile = ''
-TopTcpPortsMDFile = ''
-TopUdpPortsMDFile = ''
-LiveHostsUniqueFile = ''
-TopTcpPortsUniqueFile = ''
-TopUdpPortsUniqueFile = ''
-FinalReportMDFile = ''
-FinalReportHTMLFile = ''
-CurrentDateTime = ''
 
 
 #####################################################################################################################
@@ -92,7 +62,7 @@ message = """
  _|_ | | |_ (/_ | __) |_) \/ 
                       |   /  
                                 
-IntelSpy v{} - Perform automated network reconnaissance scans to gather network intelligence.
+IntelSpy v{0} - Perform automated network reconnaissance scans to gather network intelligence.
 IntelSpy is an open source tool licensed under GPLv3.
 Written by: @maldevel | Logisek
 https://pentest-labs.com/
@@ -103,855 +73,1066 @@ https://github.com/maldevel/intelspy
 
 
 #####################################################################################################################
-class report:
+def _quit():
+    try:
+        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, TERM_FLAGS)
+    except Exception as e:
+        pass
 
-	@classmethod
-	def html(self, mdfile,htmlfile):
 
-		log.info('Generating HTML report.')
-		command = "pandoc -f markdown {0} > {1}".format(mdfile, htmlfile)
-		log.debug('Command: {0}'.format(command))
-		start = time.time()
+#####################################################################################################################
 
-		try:
-			exec.run(command, True)
-			log.writeCmdLog(command)
+atexit.register(_quit)
+TERM_FLAGS = termios.tcgetattr(sys.stdin.fileno())
 
-		except Exception as e:
-			log.error("An error occured during HTML report generation: {0}.".format(e))
+verbose = 0
+nmap = '-vv --reason -Pn'
+srvname = ''
+heartbeat_interval = 60
+port_scan_profile = None
 
-		message = "Task completed in {0}.".format(help.elapsedTime(start))
-		log.infoPickC(message, Fore.CYAN)
+port_scan_profiles_config = None
+service_scans_config = None
+global_patterns = []
+
+username_wordlist = '/usr/share/seclists/Usernames/top-usernames-shortlist.txt'
+password_wordlist = '/usr/share/seclists/Passwords/darkweb2017-top100.txt'
+
+RootDir = os.path.dirname(os.path.realpath(__file__))
+ProjectDir = ''
+CommandsDir = ''
+DatabaseDir = ''
+LogsDir = ''
+ReportDir = ''
+TargetsDir = ''
+LogsFile = ''
+DatabaseFile = ''
+FinalReportMDFile = ''
+FinalReportHTMLFile = ''
+CurrentDateTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+DbConnection = None
+
+#####################################################################################################################
+
+def e(*args, frame_index=1, **kvargs):
+    frame = sys._getframe(frame_index)
+
+    vals = {}
+
+    vals.update(frame.f_globals)
+    vals.update(frame.f_locals)
+    vals.update(kvargs)
+
+    return string.Formatter().vformat(' '.join(args), args, vals)
+
+
+#####################################################################################################################
+
+def cprint(*args, type='info', color=Fore.RESET, char='*', sep=' ', end='\n', frame_index=1, file=sys.stdout, **kvargs):
+    frame = sys._getframe(frame_index)
+
+    vals = {
+        'bgreen':  Fore.GREEN  + Style.BRIGHT,
+        'bred':    Fore.RED    + Style.BRIGHT,
+        'bblue':   Fore.BLUE   + Style.BRIGHT,
+        'byellow': Fore.YELLOW + Style.BRIGHT,
+        'bmagenta': Fore.MAGENTA + Style.BRIGHT,
+
+        'green':  Fore.GREEN,
+        'red':    Fore.RED,
+        'blue':   Fore.BLUE,
+        'yellow': Fore.YELLOW,
+        'magenta': Fore.MAGENTA,
+
+        'bright': Style.BRIGHT,
+        'srst':   Style.NORMAL,
+        'crst':   Fore.RESET,
+        'rst':    Style.NORMAL + Fore.RESET
+    }
+
+    vals.update(frame.f_globals)
+    vals.update(frame.f_locals)
+    vals.update(kvargs)
+
+    unfmt = ''
+    if char is not None:
+        unfmt += color + '[' + Style.BRIGHT + char + Style.NORMAL + ']' + Fore.RESET + sep
+    unfmt += sep.join(args)
+
+    fmted = unfmt
+
+    for attempt in range(10):
+        try:
+            fmted = string.Formatter().vformat(unfmt, args, vals)
+            break
+        except KeyError as err:
+            key = err.args[0]
+            unfmt = unfmt.replace('{' + key + '}', '{{' + key + '}}')
+
+    print(fmted, sep=sep, end=end, file=file)
+
+    try:
+        with open(LogsFile, "a") as logFile:
+            ts = datetime.now().strftime("%d/%b/%Y:%H:%M:%S")
+            tz = datetime.now(timezone.utc).astimezone().strftime('%z')
+            hostname = socket.gethostname()
+            printable = set(string.printable)
+            logStr = ''.join(filter(lambda x: x in printable, fmted))
+            logStr = re.sub(r"\[[0-9]{1,2}m", "", logStr)
+            logFile.write("[{0} {1}] {2} Type={3} Log=\"{4}\"\n".format(ts,tz,hostname,type,logStr))
+    except Exception as e:
+        sys.exit(1)
 
 
 
 #####################################################################################################################
-class db:
-	@classmethod
-	def connect(self, analyze):
-		global DatabaseFile, DbConnection
+def debug(*args, color=Fore.BLUE, sep=' ', end='\n', file=sys.stdout, **kvargs):
+    if verbose >= 2:
+        cprint(*args, type='debug', color=color, char='-', sep=sep, end=end, file=file, frame_index=2, **kvargs)
 
-		try:
-			DbConnection = sqlite3.connect(DatabaseFile)
-			if not analyze:
-				db.createLiveHostsTbl()
-				db.createTopTcpPortsTbl()
-				db.createTopUdpPortsTbl()
+def info(*args, sep=' ', end='\n', file=sys.stdout, **kvargs):
+    cprint(*args, type='info', color=Fore.GREEN, char='*', sep=sep, end=end, file=file, frame_index=2, **kvargs)
 
-			log.info('Database file {0}.'.format(DatabaseFile))
-		except Exception as e:
-			log.error("An error occured during sqlite3 database connection: {0}.".format(str(e)))
-			if DbConnection:
-				DbConnection.close()
-			exit(1)
+def warn(*args, sep=' ', end='\n', file=sys.stderr, **kvargs):
+    cprint(*args, type='warning', color=Fore.YELLOW, char='!', sep=sep, end=end, file=file, frame_index=2, **kvargs)
 
-	@classmethod
-	def disconnect(self):
-		global DbConnection
+def error(*args, sep=' ', end='\n', file=sys.stderr, **kvargs):
+    cprint(*args, type='error', color=Fore.RED, char='!', sep=sep, end=end, file=file, frame_index=2, **kvargs)
 
-		try:
-			if DbConnection:
-				DbConnection.close()
-		except Exception as e:
-			log.error("An error occured during sqlite3 database connection: {0}.".format(str(e)))
-			exit(1)
-	
-	@classmethod
-	def addLiveHost(self, liveHost):
-		global DbConnection
-
-		c = DbConnection.cursor()
-		c.execute('''REPLACE INTO live_hosts(Ipaddr) 
-			VALUES(?);''', [liveHost])
-		DbConnection.commit()
-		id = c.lastrowid
-		c.close()
-		return id
-
-	@classmethod
-	def addTopTcpPort(self, host, ports):
-		global DbConnection
-
-		c = DbConnection.cursor()
-		c.execute('''REPLACE INTO top_tcp_ports(Ipaddr,Ports) 
-			VALUES(?,?);''', (host,ports))
-		DbConnection.commit()
-		id = c.lastrowid
-		c.close()
-		return id
-
-	@classmethod
-	def addTopUdpPort(self, host, ports):
-		global DbConnection
-
-		c = DbConnection.cursor()
-		c.execute('''REPLACE INTO top_udp_ports(Ipaddr,Ports) 
-			VALUES(?,?);''', (host,ports))
-		DbConnection.commit()
-		id = c.lastrowid
-		c.close()
-		return id
-
-	@classmethod
-	def getLiveHosts(self):
-		global DbConnection
-
-		c = DbConnection.cursor()
-		c.execute('''SELECT Ipaddr from live_hosts;''')
-		DbConnection.commit()
-		rows = c.fetchall()
-		c.close()
-		return rows
-
-	@classmethod
-	def createLiveHostsTbl(self):
-		global DbConnection
-
-		DbConnection.execute('''CREATE TABLE live_hosts
-         (ID INTEGER PRIMARY KEY AUTOINCREMENT,
-         Ipaddr VARCHAR(50) UNIQUE NOT NULL);''')
-
-	@classmethod
-	def createTopTcpPortsTbl(self):
-		global DbConnection
-
-		DbConnection.execute('''CREATE TABLE top_tcp_ports
-         (ID INTEGER PRIMARY KEY AUTOINCREMENT,
-         Ipaddr VARCHAR(50) UNIQUE NOT NULL, 
-         Ports TEXT NOT NULL);''')
-
-	@classmethod
-	def createTopUdpPortsTbl(self):
-		global DbConnection
-
-		DbConnection.execute('''CREATE TABLE top_udp_ports
-         (ID INTEGER PRIMARY KEY AUTOINCREMENT,
-         Ipaddr VARCHAR(50) UNIQUE NOT NULL, 
-         Ports TEXT NOT NULL);''')
+def fail(*args, sep=' ', end='\n', file=sys.stderr, **kvargs):
+    cprint(*args, type='failure', color=Fore.RED, char='!', sep=sep, end=end, file=file, frame_index=2, **kvargs)
+    exit(-1)
+#####################################################################################################################
 
 
 
 #####################################################################################################################
-class md:
-	@classmethod
-	def finalReportHeaders(self,target):
-		data = "# Final Report\n\n"
-		data += "## Target\n\n"
-		data += "* {0}\n\n".format(target)
-		data += "---\n\n"
-		return data
+def calculate_elapsed_time(start_time):
+    elapsed_seconds = round(time.time() - start_time)
 
-	@classmethod
-	def genLiveHosts(self, live_hosts):
-		data = "## Live Hosts\n\n"
-		for val in live_hosts:
-			if val != "":
-				data += "* " + val + "\n"
-		data += "\n---\n\n"
-		return data
+    m, s = divmod(elapsed_seconds, 60)
+    h, m = divmod(m, 60)
 
-	@classmethod
-	def genTopPorts(self, topOpenPorts, topNum, scanType):
-		data = "## Top {0} {1} Ports\n\n".format(topNum,scanType)
-		for key, value in topOpenPorts.items():
-			data += "### {0}\n\n".format(key)
-			if value != "":
-				for port in value:
-					data += "* " + port + "\n"
-				data += "\n"
-			data += "---\n\n"
-		return data
+    elapsed_time = []
+    if h == 1:
+        elapsed_time.append(str(h) + ' hour')
+    elif h > 1:
+        elapsed_time.append(str(h) + ' hours')
 
-	@classmethod
-	def getUniquePorts(self, ports, topNum, scanType):
-		data = "## Unique Top {0} {1} Ports Open\n\n".format(topNum,scanType)
-		data += "* {0}\n\n".format(ports)
-		data += "---\n\n"
-		return data
+    if m == 1:
+        elapsed_time.append(str(m) + ' minute')
+    elif m > 1:
+        elapsed_time.append(str(m) + ' minutes')
 
-	@classmethod
-	def getUniqueHosts(self, hosts):
-		data = "## Unique Live Hosts\n\n"
-		data += "* {0}\n\n".format(hosts)
-		data += "---\n\n"
-		return data
+    if s == 1:
+        elapsed_time.append(str(s) + ' second')
+    elif s > 1:
+        elapsed_time.append(str(s) + ' seconds')
+    else:
+        elapsed_time.append('less than a second')
 
-
-#####################################################################################################################
-class pt:
-	@classmethod
-	def setMode(self, target):
-		ipv4 = ipaddress.IPv4Network(target)
-		InternalPTMode = ipv4.is_private
-		return InternalPTMode
+    return ', '.join(elapsed_time)
 
 
 
 #####################################################################################################################
-class exec:
-	@classmethod
-	def run(self, command, shell):
-		print(Fore.MAGENTA + Style.BRIGHT)
-		subprocess.run(command, shell=shell)
-		print(Style.NORMAL + Fore.RESET)
+port_scan_profiles_config_file = 'port-scan-profiles.toml'
+with open(os.path.join(RootDir, 'config', port_scan_profiles_config_file), 'r') as p:
+    try:
+        port_scan_profiles_config = toml.load(p)
 
-	@classmethod
-	def pipe(self, command):
-		print(Fore.MAGENTA + Style.BRIGHT)
-		p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		out, err = p.communicate()
-		print(out)
-		print(Style.NORMAL + Fore.RESET)
-		return out
+        if len(port_scan_profiles_config) == 0:
+            fail('There do not appear to be any port scan profiles configured in the {port_scan_profiles_config_file} config file.')
 
+    except toml.decoder.TomlDecodeError as e:
+        fail('Error: Couldn\'t parse {port_scan_profiles_config_file} config file. Check syntax and duplicate tags.')
 
+with open(os.path.join(RootDir, 'config', 'service-scans.toml'), 'r') as c:
+    try:
+        service_scans_config = toml.load(c)
+    except toml.decoder.TomlDecodeError as e:
+        fail('Error: Couldn\'t parse service-scans.toml config file. Check syntax and duplicate tags.')
 
-#####################################################################################################################
-class help:
-
-	@classmethod
-	def writeMD(self, data, filePath):
-		with open(filePath, 'w') as file:
-				file.write(data)
-
-	@classmethod
-	def appendMD(self, data, filePath):
-		with open(filePath, 'a') as file:
-				file.write(data)
-
-	@classmethod
-	def elapsedTime(self, start):
-	    sec = round(time.time() - start)
-
-	    m, s = divmod(sec, 60)
-	    h, m = divmod(m, 60)
-
-	    tt = []
-	    if h == 1:
-	        tt.append(str(h) + ' hour')
-	    elif h > 1:
-	        tt.append(str(h) + ' hours')
-
-	    if m == 1:
-	        tt.append(str(m) + ' minute')
-	    elif m > 1:
-	        tt.append(str(m) + ' minutes')
-
-	    if s == 1:
-	        tt.append(str(s) + ' second')
-	    elif s > 1:
-	        tt.append(str(s) + ' seconds')
-	    else:
-	        tt.append('less than a second')
-
-	    return ', '.join(tt)
+with open(os.path.join(RootDir, 'config', 'global-patterns.toml'), 'r') as p:
+    try:
+        global_patterns = toml.load(p)
+        if 'pattern' in global_patterns:
+            global_patterns = global_patterns['pattern']
+        else:
+            global_patterns = []
+    except toml.decoder.TomlDecodeError as e:
+        fail('Error: Couldn\'t parse global-patterns.toml config file. Check syntax and duplicate tags.')
 
 
 
 #####################################################################################################################
-class grep:
+if 'username_wordlist' in service_scans_config:
+    if isinstance(service_scans_config['username_wordlist'], str):
+        username_wordlist = service_scans_config['username_wordlist']
 
-	@classmethod
-	def openUdpPorts(self, target, numOfPorts):
-		global TopUdpPortsDir,TopUdpPortsFile, TopUdpPortsMDFile, TopUdpPortsUniqueFile, TopUdpPortsMatrixFile
-		grep.openTopPortsAndServices('UDP', target, numOfPorts, TopUdpPortsDir, TopUdpPortsFile, 
-			TopUdpPortsMDFile, TopUdpPortsUniqueFile, TopUdpPortsMatrixFile)
-
-	@classmethod
-	def openTcpPorts(self, target, numOfPorts):
-		global TopTcpPortsDir,TopTcpPortsFile, TopTcpPortsMDFile, TopTcpPortsUniqueFile, TopTcpPortsMatrixFile
-		grep.openTopPortsAndServices('TCP', target, numOfPorts, TopTcpPortsDir, TopTcpPortsFile, 
-			TopTcpPortsMDFile, TopTcpPortsUniqueFile, TopTcpPortsMatrixFile)
-
-	@classmethod
-	def openTopPortsAndServices(self, scanType, target, numOfPorts, path, portsFile, portsMDfile, portsUniqueFile, portsMatrixFile):
-		global LogsFile
-
-		cmdOutput = ''
-
-		try:
-
-			gnmapFilesDir = os.path.join(path, '*.gnmap')
-			#command = """egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-| sed 's/Ignored.*//g' | 
-			#awk '{{printf \"Host: \" $1 \"\\nOpen ports: \" NF-1 \"\\n\"; $1=\"\"; for(i=2; i<=NF; i++) 
-			#{{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); 
-			#printf \"%s\\t%s\\n\", v[1], v[5]}}; a=\"\"; printf \"\\n\"; }}'| tee {1}""".format(gnmapFilesDir, portsFile)
-			command = "egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-|sed 's/Ignored.*//g' |sed 's/ /_/'| sed 's/, /,/g'| awk -v FS=_ '{{printf \"Host: \" $1 \"\\n\"; $1=\"\"; for(i=2; i<=NF; i++){{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); printf \"%-10s%-20s%s\\n\", v[1], v[5], v[7]}}; a=\"\"; printf \"\\n\"; }}'| tee {1}".format(gnmapFilesDir, portsFile)
-
-			#commandMatrix = """egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-| sed 's/Ignored.*//g' | 
-			#awk '{{printf $1 \";\" NF-1 \";\"; $1=\"\"; for(i=2; i<=NF; i++) {{ a=a\"\"$i; }}; 
-			#split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); 
-			#printf \"%s(%s),\", v[1], v[5]}}; a=\"\"; printf \"\\n\"; }}'> {1}""".format(gnmapFilesDir, TopTcpPortsMatrixFile)
-			commandMatrix = "egrep -v \"^#|Status: Up\" {0}|cut -d' ' -f2,4-|sed 's/Ignored.*//g' |sed 's/ /_/'| sed 's/, /,/g'| awk -v FS=_ '{{printf $1 \";\"; $1=\"\"; for(i=2; i<=NF; i++){{ a=a\"\"$i; }}; split(a,s,\",\"); for(e in s) {{ split(s[e],v,\"/\"); printf \"%s(%s)[%s],\", v[1], v[5], v[7]}}; a=\"\"; printf \"\\n\"; }}'> {1}".format(gnmapFilesDir, TopTcpPortsMatrixFile)
-
-			log.info('Hosts with Top {0} {1} ports open({2}).'.format(numOfPorts,scanType,target))
-			log.debug('Command: {0}'.format(command))
-			log.info('Output')
-
-			start = time.time()
-			exec.run(command, True)
-			log.writeCmdLog(command)
-
-			exec.run(commandMatrix, True)
-			log.writeCmdLog(commandMatrix)
-
-		except Exception as e:
-			log.error("An error occured during nmap scan results grep: {0}.".format(str(e)))
-
-		try:
-			with open(portsFile, 'r') as file:
-				cmdOutput = file.read()
-
-			with open(LogsFile, 'a') as file:
-				file.write(cmdOutput)
-
-			with open(TopTcpPortsMatrixFile, 'r') as file:
-				cmdOutput2 = file.read()
-
-			with open(LogsFile, 'a') as file:
-				file.write(cmdOutput2)
-
-		except Exception as e:
-			log.error("An error occured while trying to append grep result to log file '{0}': {1}.".format(LogsFile, e))
-
-		message = "Task completed in {0}.".format(help.elapsedTime(start))
-		log.infoPickC(message, Fore.CYAN)
-
-		portsList = list(filter(bool, cmdOutput2.split('\n')))
-		portsCounter = 0
-		openPortsDict = {}
-		allPorts = []
-
-		for line in portsList:
-			data = list(filter(bool, line.split(';')))
-			host = data[0]
-			ports = list(filter(bool, data[1].split(',')))
-			allPorts += ports
-			portsCounter += len(ports)
-			openPortsDict[host] = ports
-
-		log.info("{0} open {1} ports found on {2} hosts.".format(portsCounter, scanType, len(portsList)))
-		help.writeMD(md.genTopPorts(openPortsDict, numOfPorts, scanType), portsMDfile)
-		help.appendMD(md.genTopPorts(openPortsDict, numOfPorts, scanType), FinalReportMDFile)
-
-		for host, ports in openPortsDict.items():
-			if scanType.lower() == 'tcp':
-				db.addTopTcpPort(host, ','.join(ports))
-			else:
-				db.addTopUdpPort(host, ','.join(ports))
-
-		for index, item in enumerate(allPorts):
-			allPorts[index] = int(re.sub(r"\(.*", "", allPorts[index]))
-
-		uniquePorts = sorted(set(allPorts))
-		portscommalist = ','.join(str(s) for s in uniquePorts)
-
-		log.info("{0} unique open {1} ports: {2}".format(len(uniquePorts),scanType, portscommalist))
-		help.appendMD(md.getUniquePorts(portscommalist,numOfPorts,scanType), FinalReportMDFile)
-
-		with open(portsUniqueFile, 'w') as file:
-			file.write(portscommalist)
-
-		return cmdOutput
-
-	@classmethod
-	def liveHosts(self, target):
-		global LiveHostsDir, LiveHostsListFile, LogsFile, LiveHostsMDFile,LiveHostsUniqueFile
-		
-		cmdOutput = ''
-
-		try:
-
-			gnmapFilesDir = os.path.join(LiveHostsDir, '*.gnmap')
-			command = "cat {0} | grep 'Status: Up' | cut -d ' ' -f2 | sort -V | uniq | tee {1}".format(gnmapFilesDir, LiveHostsListFile)
-			
-			log.info('Target {0} Live hosts.'.format(target))
-			log.debug('Command: {0}'.format(command))
-			log.info('Output')
-
-			start = time.time()
-			exec.run(command, True)
-			log.writeCmdLog(command)
-
-		except Exception as e:
-			log.error("An error occured during nmap scan results grep: {0}.".format(str(e)))
-
-		try:
-			with open(LiveHostsListFile, 'r') as file:
-				cmdOutput = file.read()
-
-			with open(LogsFile, 'a') as file:
-				file.write(cmdOutput)
-
-		except Exception as e:
-			log.error("An error occured while trying to append grep result to log file '{0}': {1}.".format(LogsFile, e))
-
-		
-		message = "Task completed in {0}.".format(help.elapsedTime(start))
-		log.infoPickC(message, Fore.CYAN)
-
-		LiveHostsList = list(filter(bool, cmdOutput.split('\n')))
-		log.info("{0} live hosts found.".format(len(LiveHostsList)))
-
-		help.writeMD(md.genLiveHosts(LiveHostsList), LiveHostsMDFile)
-		help.appendMD(md.genLiveHosts(LiveHostsList), FinalReportMDFile)
-
-		hostscommalist = ','.join(str(s) for s in LiveHostsList)
-		log.info("Unique Live Hosts: {0}".format(hostscommalist))
-		help.appendMD(md.getUniqueHosts(hostscommalist), FinalReportMDFile)
-
-		with open(LiveHostsUniqueFile, 'w') as file:
-			file.write(hostscommalist)
-
-		for host in LiveHostsList:
-			db.addLiveHost(host)
-
-		return cmdOutput
+if 'password_wordlist' in service_scans_config:
+    if isinstance(service_scans_config['password_wordlist'], str):
+        password_wordlist = service_scans_config['password_wordlist']
 
 
 
 #####################################################################################################################
-class fm:
+async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
+    address = target.address
+    while True:
+        line = await stream.readline()
+        if line:
+            line = str(line.rstrip(), 'utf8', 'ignore')
+            debug(color + '[' + Style.BRIGHT + address + ' ' + tag + Style.NORMAL + '] ' + Fore.RESET + '{line}', color=color)
 
-	@classmethod
-	def createProjectDirStructure(self, target, projName, workingDir, defaultTopTcpPorts, defaultTopUdpPorts, analyze):
-		global ProjectDir, LiveHostsDir, LogsDir, LogsFile, ReportDir, LiveHostsListFile, LiveHostsMDFile 
-		global DatabaseDir, DatabaseFile, CommandsDir, CommandsFile
-		global TopTcpPortsDir, TopTcpPortsFile, TopTcpPortsMatrixFile, TopTcpPortsMDFile, TopTcpPortsUniqueFile
-		global TopUdpPortsDir, TopUdpPortsFile, TopUdpPortsMatrixFile, TopUdpPortsMDFile, TopUdpPortsUniqueFile
-		global FinalReportMDFile, FinalReportHTMLFile,CurrentDateTime,LiveHostsUniqueFile
+            for p in global_patterns:
+                matches = re.findall(p['pattern'], line)
+                if 'description' in p:
+                    for match in matches:
+                        if verbose >= 1:
+                            info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
+                        async with target.lock:
+                            with open(os.path.join(target.scandir, '_patterns.log'), 'a') as file:
+                                file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
+                else:
+                    for match in matches:
+                        if verbose >= 1:
+                            info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
+                        async with target.lock:
+                            with open(os.path.join(target.scandir, '_patterns.log'), 'a') as file:
+                                file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
 
-		ProjectDir = os.path.join(workingDir, projName)
-		ScansDir = os.path.join(ProjectDir, 'scans')
+            for p in patterns:
+                matches = re.findall(p['pattern'], line)
+                if 'description' in p:
+                    for match in matches:
+                        if verbose >= 1:
+                            info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
+                        async with target.lock:
+                            with open(os.path.join(target.scandir, '_patterns.log'), 'a') as file:
+                                file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
+                else:
+                    for match in matches:
+                        if verbose >= 1:
+                            info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
+                        async with target.lock:
+                            with open(os.path.join(target.scandir, '_patterns.log'), 'a') as file:
+                                file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
+        else:
+            break
 
-		DatabaseDir = os.path.join(ProjectDir, 'db')
-		DatabaseFile = os.path.join(DatabaseDir, "{0}-database-{1}-{2}.db".format(projName, target.replace('/', '_'), 
-			CurrentDateTime))
-
-		CommandsDir = os.path.join(ProjectDir, 'commands')
-		CommandsFile = os.path.join(CommandsDir, "{0}-commands-log-{1}-{2}.txt".format(projName, target.replace('/', '_'), 
-			CurrentDateTime))
-
-		LiveHostsDir = os.path.join(ScansDir, 'live-hosts', target.replace('/', '_'), CurrentDateTime)
-		
-		TopTcpPortsDir = os.path.join(ScansDir, 'tcp', 'ports', "top-{0}".format(defaultTopTcpPorts), target.replace('/', '_'), 
-			CurrentDateTime)
-		TopUdpPortsDir = os.path.join(ScansDir, 'udp', 'ports', "top-{0}".format(defaultTopUdpPorts), target.replace('/', '_'), 
-			CurrentDateTime)
-
-		LogsDir = os.path.join(ProjectDir, 'logs', target.replace('/', '_'))
-		LogsFile = os.path.join(LogsDir, "{0}-log-{1}-{2}.txt".format(projName, target.replace('/', '_'), 
-			CurrentDateTime))
-		
-		ReportDir = os.path.join(ProjectDir, 'report', target.replace('/', '_'), CurrentDateTime)
-
-		FinalReportMDFile = os.path.join(ReportDir, "{0}-final-report-{1}-{2}.md".format(projName, target.replace('/', '_'), 
-			CurrentDateTime))
-		FinalReportHTMLFile = FinalReportMDFile.replace('.md', '.html')
-
-		LiveHostsListFile = os.path.join(ReportDir, "{0}-live-hosts-list-{1}-{2}.txt".format(projName, target.replace('/', '_'), 
-			CurrentDateTime))
-		LiveHostsUniqueFile = os.path.join(ReportDir, "{0}-live-hosts-list-{1}-{2}-unique.txt".format(projName, target.replace('/', '_'), 
-			CurrentDateTime))
-
-		LiveHostsMDFile = LiveHostsListFile.replace('.txt', '.md')
-
-		TopTcpPortsFile = os.path.join(ReportDir, "{0}-top-{1}-tcp-ports-{2}-{3}.txt".format(projName, defaultTopTcpPorts, 
-			target.replace('/', '_'), CurrentDateTime))
-		TopUdpPortsFile = os.path.join(ReportDir, "{0}-top-{1}-udp-ports-{2}-{3}.txt".format(projName, defaultTopUdpPorts, 
-			target.replace('/', '_'), CurrentDateTime))
-
-		TopTcpPortsMatrixFile = os.path.join(ReportDir, "{0}-top-{1}-tcp-ports-{2}-{3}-matrix.txt".format(projName, 
-			defaultTopTcpPorts, target.replace('/', '_'), CurrentDateTime))
-		TopUdpPortsMatrixFile = os.path.join(ReportDir, "{0}-top-{1}-udp-ports-{2}-{3}-matrix.txt".format(projName, 
-			defaultTopUdpPorts, target.replace('/', '_'), CurrentDateTime))
-
-		TopTcpPortsMDFile = TopTcpPortsFile.replace('.txt', '.md')
-		TopUdpPortsMDFile = TopUdpPortsFile.replace('.txt', '.md')
-
-		TopTcpPortsUniqueFile = os.path.join(ReportDir, "{0}-top-{1}-tcp-ports-{2}-{3}-unique.txt".format(projName, 
-			defaultTopTcpPorts, target.replace('/', '_'), CurrentDateTime))
-		TopUdpPortsUniqueFile = os.path.join(ReportDir, "{0}-top-{1}-udp-ports-{2}-{3}-unique.txt".format(projName, 
-			defaultTopUdpPorts, target.replace('/', '_'), CurrentDateTime))
-
-		if not analyze:
-			Path(LiveHostsDir).mkdir(parents=True, exist_ok=True)
-			Path(TopTcpPortsDir).mkdir(parents=True, exist_ok=True)
-			Path(TopUdpPortsDir).mkdir(parents=True, exist_ok=True)
-			Path(LogsDir).mkdir(parents=True, exist_ok=True)
-			Path(ReportDir).mkdir(parents=True, exist_ok=True)
-			Path(DatabaseDir).mkdir(parents=True, exist_ok=True)
-			Path(CommandsDir).mkdir(parents=True, exist_ok=True)
-			log.info("Creating project directory structure '{0}'.".format(ProjectDir))		
 
 
 
 #####################################################################################################################
-class log:
+async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
+    async with semaphore:
+        address = target.address
+        scandir = target.scandir
 
-	@classmethod
-	def nextEventID(self):
-		global EventID
-		EventID += 1
-		return EventID
+        info('Running task {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{cmd}{rst}' if verbose >= 1 else ''))
 
-	@classmethod
-	def infoPickC(self, logStr, color):
-		log.write('Info', logStr, color)
+        async with target.lock:
+            with open(os.path.join(scandir, '_commands.log'), 'a') as file:
+                file.writelines(e('{cmd}\n\n'))
 
-	@classmethod
-	def info(self, logStr):
-		log.write('Info', logStr, Fore.GREEN)
+        start_time = time.time()
+        process = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, executable='/bin/bash')
+        async with target.lock:
+            target.running_tasks.append(tag)
 
-	@classmethod
-	def error(self, logStr):
-		log.write('Error', logStr, Fore.RED)
+        await asyncio.wait([
+            read_stream(process.stdout, target, tag=tag, patterns=patterns),
+            read_stream(process.stderr, target, tag=tag, patterns=patterns, color=Fore.RED)
+        ])
 
-	@classmethod
-	def debug(self, logStr):
-		log.write('Debug', logStr, Fore.BLUE)
+        await process.wait()
+        async with target.lock:
+            target.running_tasks.remove(tag)
+        elapsed_time = calculate_elapsed_time(start_time)
 
-	@classmethod
-	def write(self, logType, logStr, color):
-		global LogsFile
+    if process.returncode != 0:
+        error('Task {bred}{tag}{rst} on {byellow}{address}{rst} returned non-zero exit code: {process.returncode}')
+        async with target.lock:
+            with open(os.path.join(scandir, '_errors.log'), 'a') as file:
+                file.writelines(e('[*] Task {tag} returned non-zero exit code: {process.returncode}. Command: {cmd}\n'))
+    else:
+        info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
 
-		eventID = str(log.nextEventID())
+    return {'returncode': process.returncode, 'name': 'run_cmd'}
 
-		print("[{0} {1}] ".format(datetime.now().strftime("%d/%b/%Y:%H:%M:%S"), 
-			datetime.now(timezone.utc).astimezone().strftime('%z')) + color + logStr + Fore.RESET )
-
-		try:
-			with open(LogsFile, "a") as logFile:
-				logFile.write("[{0} {1}] {2} EventID={3} Type={4} Log=\"{5}\"\n".format(datetime.now().strftime("%d/%b/%Y:%H:%M:%S"), 
-					datetime.now(timezone.utc).astimezone().strftime('%z'), socket.gethostname(), eventID, logType, logStr))
-		except Exception as e:
-			print("[{0} {1}] {2} '{3}': {4}\n".format(datetime.now().strftime("%d/%b/%Y:%H:%M:%S"), 
-				datetime.now(timezone.utc).astimezone().strftime('%z'), "There is a problem writing to the log file", LogsFile, str(e)))
-			sys.exit()
-
-		return
-
-	@classmethod
-	def writeCmdLog(self, cmd):
-		global CommandsFile
-
-		try:
-			with open(CommandsFile, "a") as logFile:
-				logFile.write("[{0} {1}] {2} Log=\"{3}\"\n".format(datetime.now().strftime("%d/%b/%Y:%H:%M:%S"), 
-					datetime.now(timezone.utc).astimezone().strftime('%z'), socket.gethostname(), cmd))
-		except Exception as e:
-			print("[{0} {1}] {2} '{3}': {4}\n".format(datetime.now().strftime("%d/%b/%Y:%H:%M:%S"), 
-				datetime.now(timezone.utc).astimezone().strftime('%z'), "There is a problem writing to the log file", LogsFile, str(e)))
-			sys.exit()
-
-		return
 
 
 
 #####################################################################################################################
-class user:
+async def parse_port_scan(stream, tag, target, pattern):
+    address = target.address
+    ports = []
 
-	@classmethod
-	def isRoot(self):
-		if os.geteuid() != 0:
-			log.error("You need root permissions.")
-			return False
-		return True
+    while True:
+        line = await stream.readline()
+        if line:
+            line = str(line.rstrip(), 'utf8', 'ignore')
+            debug(Fore.BLUE + '[' + Style.BRIGHT + address + ' ' + tag + Style.NORMAL + '] ' + Fore.RESET + '{line}', color=Fore.BLUE)
 
-
-
-#####################################################################################################################
-class scanner:
-
-	@classmethod
-	def topTcpPorts(self, projName, topports, exclude,speed):
-		global TopTcpPortsDir
-
-		ips = db.getLiveHosts()
-		for host in ips:
-			log.info('Scanning target {0}'.format(host[0]))
-			scanner.topPorts(projName, TopTcpPortsDir, host[0], topports, 'TCP', exclude,speed)
-
-	@classmethod
-	def topUdpPorts(self, projName, topports, exclude,speed):
-		global TopUdpPortsDir
-
-		ips = db.getLiveHosts()
-		for host in ips:
-			log.info('Scanning target {0}'.format(host[0]))
-			scanner.topPorts(projName, TopUdpPortsDir, host[0], topports, 'UDP', exclude,speed)
-
-	@classmethod
-	def livehosts(self, projName, target, exclude,speed):
-		global LiveHostsDir
-
-		log.info('Scanning target {0}'.format(target))
-		scanner.liveHostsIcmpEcho(projName, LiveHostsDir, target, exclude,speed)
-
-		log.info('Scanning target {0}'.format(target))
-		scanner.liveHostsTcpAck(projName, LiveHostsDir, target, exclude,speed)
-
-		log.info('Scanning target {0}'.format(target))
-		scanner.liveHostsTcpSyn(projName, LiveHostsDir, target, exclude,speed)
-
-		log.info('Scanning target {0}'.format(target))
-		scanner.liveHostsSctp(projName, LiveHostsDir, target, exclude,speed)
-
-		log.info('Scanning target {0}'.format(target))
-		scanner.liveHostsUdp(projName, LiveHostsDir, target, exclude,speed)
-
-		log.info('Scanning target {0}'.format(target))
-		scanner.liveHostsProtocolPing(projName, LiveHostsDir, target, exclude,speed)
-
-		log.info('Scanning target {0}'.format(target))
-		scanner.liveHostsTimestamp(projName, LiveHostsDir, target, exclude,speed)
-
-		log.info('Scanning target {0}'.format(target))
-		scanner.liveHostsNetmask(projName, LiveHostsDir, target, exclude,speed)
-
-		log.info('Scanning target {0}'.format(target))
-		scanner.liveHostsTopTcp100(projName, LiveHostsDir, target, exclude,speed)
+            parse_match = re.search(pattern, line)
+            if parse_match:
+                ports.append(parse_match.group('port'))
 
 
-	@classmethod
-	def generateNmapLogPrefix(self, projName, prefix, outputDir, target):
-		global CurrentDateTime
-		nmapLogFilePrefix = "{0}-{1}-{2}-{3}".format(projName, prefix, target, 
-			CurrentDateTime)
+            for p in global_patterns:
+                matches = re.findall(p['pattern'], line)
+                if 'description' in p:
+                    for match in matches:
+                        if verbose >= 1:
+                            info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
+                        async with target.lock:
+                            with open(os.path.join(target.scandir, '_patterns.log'), 'a') as file:
+                                file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
+                else:
+                    for match in matches:
+                        if verbose >= 1:
+                            info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
+                        async with target.lock:
+                            with open(os.path.join(target.scandir, '_patterns.log'), 'a') as file:
+                                file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
+        else:
+            break
 
-		return os.path.join(outputDir, nmapLogFilePrefix)
+    return ports
 
-	@classmethod
-	def topPorts(self, projName, outputDir, target, topports, scanType, exclude, speed):
-		scanFlag=''
-		if scanType.lower() == 'tcp':
-			scanFlag = '-sS'
-		else:
-			scanFlag = '-sU'
-		outputDir = scanner.generateNmapLogPrefix(projName, "top-{0}-ports-{1}-scan".format(scanType,topports), outputDir, target)
-		
-		if exclude:
-			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap {0} -sV -n -Pn -vv --top-ports {1} --reason --open -T{2} -oA {3} --exclude {4} {5}".format(
-				scanFlag,topports, speed,outputDir, exclude, target)
-		else:
-			command = "nmap {0} -sV -n -Pn -vv --top-ports {1} --reason --open -T{2} -oA {3} {4}".format(scanFlag,topports, speed,outputDir, target)
-
-		scanner.scan("Top {0} {1} Ports detection".format(topports,scanType), outputDir, command, target)
-
-	@classmethod
-	def liveHostsIcmpEcho(self, projName, outputDir, target, exclude, speed):
-
-		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-icmp-echo-scan', outputDir, target.replace('/', '_'))
-		if exclude:
-			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -n -sn -PE -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
-		else:
-			command = "nmap -vv -n -sn -PE -T{0} -oA {1} {2}".format(speed,outputDir, target)
-		scanner.scan('ICMP echo Live Hosts detection', outputDir, command, target)
-
-	@classmethod
-	def liveHostsTcpAck(self, projName, outputDir, target, exclude, speed):
-
-		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-tcp-ack-scan', outputDir, target.replace('/', '_'))
-		if exclude:
-			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -n -sn -PA21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
-		else:
-			command = "nmap -vv -n -sn -PA21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -T{0} -oA {1} {2}".format(speed,outputDir, target)
-		scanner.scan('TCP ACK Live Hosts detection', outputDir, command, target)
-
-
-	@classmethod
-	def liveHostsTcpSyn(self, projName, outputDir, target, exclude, speed):
-
-		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-tcp-syn-scan', outputDir, target.replace('/', '_'))
-		if exclude:
-			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -n -sn -PS21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
-		else:
-			command = "nmap -vv -n -sn -PS21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -T{0} -oA {1} {2}".format(speed,outputDir, target)
-		scanner.scan('TCP SYN Live Hosts detection', outputDir, command, target)
-
-
-	@classmethod
-	def liveHostsSctp(self, projName, outputDir, target, exclude, speed):
-
-		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-sctp-scan', outputDir, target.replace('/', '_'))
-		if exclude:
-			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -n -sn -PY132,2905 -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
-		else:
-			command = "nmap -vv -n -sn -PY132,2905 -T{0} -oA {1} {2}".format(speed,outputDir, target)
-		scanner.scan('SCTP Live Hosts detection', outputDir, command, target)
-
-
-	@classmethod
-	def liveHostsUdp(self, projName, outputDir, target, exclude, speed):
-
-		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-udp-scan', outputDir, target.replace('/', '_'))
-		if exclude:
-			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -n -sn -PU53,67,68,69,123,135,137,138,139,161,162,445,500,514,520,631,1434,1600,4500,49152 -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
-		else:
-			command = "nmap -vv -n -sn -PU53,67,68,69,123,135,137,138,139,161,162,445,500,514,520,631,1434,1600,4500,49152 -T{0} -oA {1} {2}".format(speed,outputDir, target)
-		scanner.scan('UDP Live Hosts detection', outputDir, command, target)
-
-
-	@classmethod
-	def liveHostsProtocolPing(self, projName, outputDir, target, exclude, speed):
-
-		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-protocol-ping-scan', outputDir, target.replace('/', '_'))
-		if exclude:
-			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -n -sn -PO -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
-		else:
-			command = "nmap -vv -n -sn -PO -T{0} -oA {1} {2}".format(speed,outputDir, target)
-		scanner.scan('Protocol Ping Live Hosts detection', outputDir, command, target)
-
-
-	@classmethod
-	def liveHostsTimestamp(self, projName, outputDir, target, exclude, speed):
-
-		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-timestamp-scan', outputDir, target.replace('/', '_'))
-		if exclude:
-			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -n -sn -PP -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
-		else:
-			command = "nmap -vv -n -sn -PP -T{0} -oA {1} {2}".format(speed,outputDir, target)
-		scanner.scan('Timestamp Live Hosts detection', outputDir, command, target)
-
-
-	@classmethod
-	def liveHostsNetmask(self, projName, outputDir, target, exclude, speed):
-
-		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-netmask-scan', outputDir, target.replace('/', '_'))
-		if exclude:
-			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -n -sn -PM -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
-		else:
-			command = "nmap -vv -n -sn -PM -T{0} -oA {1} {2}".format(speed,outputDir, target)
-		scanner.scan('Netmask Live Hosts detection', outputDir, command, target)
-
-
-	@classmethod
-	def liveHostsTopTcp100(self, projName, outputDir, target, exclude,speed):
-
-		outputDir = scanner.generateNmapLogPrefix(projName, 'live-hosts-top-tcp-100-scan', outputDir, target.replace('/', '_'))
-		if exclude:
-			log.info('Excluding {0} hosts from scan.'.format(exclude))
-			command = "nmap -vv -sS -sV -n -Pn --top-ports 100 --reason --open -T{0} -oA {1} --exclude {2} {3}".format(speed,outputDir, exclude, target)
-		else:
-			command = "nmap -vv -sS -sV -n -Pn --top-ports 100 --reason --open -T{0} -oA {1} {2}".format(speed,outputDir, target)
-		scanner.scan('Top 100 TCP Ports Live Hosts detection', outputDir, command, target)
-
-
-	@classmethod
-	def scan(self, scanType, nmapLogFilePrefix, command, target):
-		global LogsFile
-
-		nmapOutput = ''
-
-		log.info('Running service {1}'.format(target, scanType))
-		log.debug('Command: {0}'.format(command))
-		log.info('Nmap Output')
-
-		start = time.time()
-
-		try:
-			exec.run(shlex.split(command), False)
-			log.writeCmdLog(command)
-
-		except Exception as e:
-			log.error("An error occured during nmap scan ({0}): {1}.".format(scanType, e))
-
-		try:
-			
-			with open(nmapLogFilePrefix + ".nmap", 'r') as file:
-				nmapOutput = file.read()
-
-			with open(LogsFile, 'a') as file:
-				file.write(nmapOutput)
-
-		except Exception as e:
-			log.error("An error occured while trying to append nmap scan output to log file '{0}': {1}.".format(LogsFile, str(e)))
-
-
-		message = "Task completed in {0}.".format(help.elapsedTime(start))
-		log.infoPickC(message, Fore.CYAN)
-
-		return nmapOutput
 
 
 
 #####################################################################################################################
-def main(args,extra):
-	global LiveHostsList,FinalReportMDFile,FinalReportHTMLFile,CurrentDateTime
+async def parse_service_detection(stream, tag, target, pattern):
+    address = target.address
+    services = []
 
-	start = time.time()
+    while True:
+        line = await stream.readline()
+        if line:
+            line = str(line.rstrip(), 'utf8', 'ignore')
+            debug(Fore.BLUE + '[' + Style.BRIGHT + address + ' ' + tag + Style.NORMAL + '] ' + Fore.RESET + '{line}', color=Fore.BLUE)
 
-	if args.analyze:
-		CurrentDateTime = args.analyze
-	else:
-		CurrentDateTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            parse_match = re.search(pattern, line)
+            if parse_match:
+                services.append((parse_match.group('protocol').lower(), int(parse_match.group('port')), parse_match.group('service')))
 
-	defaultTopTcpPorts = args.top_tcp_ports
-	defaultTopUdpPorts = args.top_udp_ports
+            for p in global_patterns:
+                matches = re.findall(p['pattern'], line)
+                if 'description' in p:
+                    for match in matches:
+                        if verbose >= 1:
+                            info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
+                        async with target.lock:
+                            with open(os.path.join(target.scandir, '_patterns.log'), 'a') as file:
+                                file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
+                else:
+                    for match in matches:
+                        if verbose >= 1:
+                            info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
+                        async with target.lock:
+                            with open(os.path.join(target.scandir, '_patterns.log'), 'a') as file:
+                                file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
+        else:
+            break
 
-	fm.createProjectDirStructure(args.target, args.project_name, args.working_dir, defaultTopTcpPorts, defaultTopUdpPorts, args.analyze)
+    return services
 
-	if not user.isRoot():
-		exit(1)
 
-	help.writeMD(md.finalReportHeaders(args.target), FinalReportMDFile)
 
-	db.connect(args.analyze)
 
-	if pt.setMode(args.target) == True:
-		log.info('Penetration Test Type: Internal.')
-	else:
-		log.info('Penetration Test Type: External.')
+#####################################################################################################################
+async def run_portscan(semaphore, tag, target, service_detection, port_scan=None):
+    async with semaphore:
 
-	if args.exclude:
-		log.info("Excluding: {0}.".format(args.exclude))
+        address = target.address
+        scandir = target.scandir
+        nmap_extra = nmap
 
-	if not args.analyze:
-		scanner.livehosts(args.project_name, args.target, args.exclude,args.speed)
+        ports = ''
+        if port_scan is not None:
+            command = e(port_scan[0])
+            pattern = port_scan[1]
 
-	grep.liveHosts(args.target)
+            info('Running port scan {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{command}{rst}' if verbose >= 1 else ''))
 
-	if not args.analyze:
-		scanner.topTcpPorts(args.project_name, defaultTopTcpPorts, args.exclude,args.speed)
+            async with target.lock:
+                with open(os.path.join(scandir, '_commands.log'), 'a') as file:
+                    file.writelines(e('{command}\n\n'))
 
-	grep.openTcpPorts(args.target, defaultTopTcpPorts)
+            start_time = time.time()
+            process = await asyncio.create_subprocess_shell(command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, executable='/bin/bash')
+            async with target.lock:
+                target.running_tasks.append(tag)
 
-	if not args.analyze:
-		scanner.topUdpPorts(args.project_name, defaultTopUdpPorts, args.exclude,args.speed)
+            output = [
+                parse_port_scan(process.stdout, tag, target, pattern),
+                read_stream(process.stderr, target, tag=tag, color=Fore.RED)
+            ]
 
-	grep.openUdpPorts(args.target, defaultTopUdpPorts)
+            results = await asyncio.gather(*output)
 
-	report.html(FinalReportMDFile,FinalReportHTMLFile)
+            await process.wait()
+            async with target.lock:
+                target.running_tasks.remove(tag)
+            elapsed_time = calculate_elapsed_time(start_time)
 
-	db.disconnect()
+            if process.returncode != 0:
+                error('Port scan {bred}{tag}{rst} on {byellow}{address}{rst} returned non-zero exit code: {process.returncode}')
+                async with target.lock:
+                    with open(os.path.join(scandir, '_errors.log'), 'a') as file:
+                        file.writelines(e('[*] Port scan {tag} returned non-zero exit code: {process.returncode}. Command: {command}\n'))
+                return {'returncode': process.returncode}
+            else:
+                info('Port scan {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
 
-	log.infoPickC("IntelSpy Scan completed in {0}.".format(help.elapsedTime(start)), Fore.CYAN)
+            ports = results[0]
+            if len(ports) == 0:
+                return {'returncode': -1}
+
+            ports = ','.join(ports)
+
+        command = e(service_detection[0])
+        pattern = service_detection[1]
+
+        info('Running service detection {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{command}{rst}' if verbose >= 1 else ''))
+
+        async with target.lock:
+            with open(os.path.join(scandir, '_commands.log'), 'a') as file:
+                file.writelines(e('{command}\n\n'))
+
+        start_time = time.time()
+        process = await asyncio.create_subprocess_shell(command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, executable='/bin/bash')
+        async with target.lock:
+            target.running_tasks.append(tag)
+
+        output = [
+            parse_service_detection(process.stdout, tag, target, pattern),
+            read_stream(process.stderr, target, tag=tag, color=Fore.RED)
+        ]
+
+        results = await asyncio.gather(*output)
+
+        await process.wait()
+        async with target.lock:
+            target.running_tasks.remove(tag)
+        elapsed_time = calculate_elapsed_time(start_time)
+
+        if process.returncode != 0:
+            error('Service detection {bred}{tag}{rst} on {byellow}{address}{rst} returned non-zero exit code: {process.returncode}')
+            async with target.lock:
+                with open(os.path.join(scandir, '_errors.log'), 'a') as file:
+                    file.writelines(e('[*] Service detection {tag} returned non-zero exit code: {process.returncode}. Command: {command}\n'))
+        else:
+            info('Service detection {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
+
+        services = results[0]
+
+        return {'returncode': process.returncode, 'name': 'run_portscan', 'services': services}
+
+
+
+
+#####################################################################################################################
+async def start_heartbeat(target, period=60):
+    while True:
+        await asyncio.sleep(period)
+        async with target.lock:
+            tasks = target.running_tasks
+            count = len(tasks)
+
+            tasks_list = ''
+            if verbose >= 1:
+                tasks_list = ': {bgreen}' + ', '.join(tasks) + '{rst}'
+
+            current_time = datetime.now().strftime('%H:%M:%S')
+
+            if count > 1:
+                info('{bgreen}[{current_time}]{rst} - There are {byellow}{count}{rst} tasks still running on {byellow}{target.address}{rst}' + tasks_list)
+            elif count == 1:
+                info('{bgreen}[{current_time}]{rst} - There is {byellow}1{rst} task still running on {byellow}{target.address}{rst}' + tasks_list)
+
+
+
+
+#####################################################################################################################
+async def scan_services(loop, semaphore, target):
+    address = target.address
+    scandir = target.scandir
+    pending = []
+
+    heartbeat = loop.create_task(start_heartbeat(target, period=heartbeat_interval))
+
+    for profile in port_scan_profiles_config:
+        if profile == port_scan_profile:
+            for scan in port_scan_profiles_config[profile]:
+                service_detection = (port_scan_profiles_config[profile][scan]['service-detection']['command'], port_scan_profiles_config[profile][scan]['service-detection']['pattern'])
+                if 'port-scan' in port_scan_profiles_config[profile][scan]:
+                    port_scan = (port_scan_profiles_config[profile][scan]['port-scan']['command'], port_scan_profiles_config[profile][scan]['port-scan']['pattern'])
+                    pending.append(run_portscan(semaphore, scan, target, service_detection, port_scan))
+                else:
+                    pending.append(run_portscan(semaphore, scan, target, service_detection))
+            break
+
+    services = []
+
+    while True:
+        if not pending:
+            heartbeat.cancel()
+            break
+
+        done, pending = await asyncio.wait(pending, return_when=FIRST_COMPLETED)
+
+        for task in done:
+            result = task.result()
+
+            if result['returncode'] == 0:
+                if result['name'] == 'run_portscan':
+                    for service_tuple in result['services']:
+                        if service_tuple not in services:
+                            services.append(service_tuple)
+                        else:
+                            continue
+
+                        protocol = service_tuple[0]
+                        port = service_tuple[1]
+                        service = service_tuple[2]
+
+                        info('Found {bmagenta}{service}{rst} on {bmagenta}{protocol}/{port}{rst} on target {byellow}{address}{rst}')
+
+                        with open(os.path.join(target.reportdir, 'notes.txt'), 'a') as file:
+                            file.writelines(e('[*] {service} found on {protocol}/{port}.\n\n\n\n'))
+
+                        if protocol == 'udp':
+                            nmap_extra = nmap + " -sU"
+                        else:
+                            nmap_extra = nmap
+
+                        secure = True if 'ssl' in service or 'tls' in service else False
+
+                        # Special cases for HTTP.
+                        scheme = 'https' if 'https' in service or 'ssl' in service or 'tls' in service else 'http'
+
+                        if service.startswith('ssl/') or service.startswith('tls/'):
+                            service = service[4:]
+
+                        for service_scan in service_scans_config:
+                            # Skip over configurable variables since the python toml parser cannot iterate over tables only.
+                            if service_scan in ['username_wordlist', 'password_wordlist']:
+                                continue
+
+                            ignore_service = False
+                            if 'ignore-service-names' in service_scans_config[service_scan]:
+                                for ignore_service_name in service_scans_config[service_scan]['ignore-service-names']:
+                                    if re.search(ignore_service_name, service):
+                                        ignore_service = True
+                                        break
+
+                            if ignore_service:
+                                continue
+
+                            matched_service = False
+
+                            if 'service-names' in service_scans_config[service_scan]:
+                                for service_name in service_scans_config[service_scan]['service-names']:
+                                    if re.search(service_name, service):
+                                        matched_service = True
+                                        break
+
+                            if not matched_service:
+                                continue
+
+                            if 'manual' in service_scans_config[service_scan]:
+                                heading = False
+                                with open(os.path.join(scandir, '_manual_commands.txt'), 'a') as file:
+                                    for manual in service_scans_config[service_scan]['manual']:
+                                        if 'description' in manual:
+                                            if not heading:
+                                                file.writelines(e('[*] {service} on {protocol}/{port}\n\n'))
+                                                heading = True
+                                            description = manual['description']
+                                            file.writelines(e('\t[-] {description}\n\n'))
+                                        if 'commands' in manual:
+                                            if not heading:
+                                                file.writelines(e('[*] {service} on {protocol}/{port}\n\n'))
+                                                heading = True
+                                            for manual_command in manual['commands']:
+                                                manual_command = e(manual_command)
+                                                file.writelines('\t\t' + e('{manual_command}\n\n'))
+                                    if heading:
+                                        file.writelines('\n')
+
+                            if 'scan' in service_scans_config[service_scan]:
+                                for scan in service_scans_config[service_scan]['scan']:
+
+                                    if 'name' in scan:
+                                        name = scan['name']
+                                        if 'command' in scan:
+                                            tag = e('{protocol}/{port}/{name}')
+                                            command = scan['command']
+
+                                            if 'ports' in scan:
+                                                port_match = False
+
+                                                if protocol == 'tcp':
+                                                    if 'tcp' in scan['ports']:
+                                                        for tcp_port in scan['ports']['tcp']:
+                                                            if port == tcp_port:
+                                                                port_match = True
+                                                                break
+                                                elif protocol == 'udp':
+                                                    if 'udp' in scan['ports']:
+                                                        for udp_port in scan['ports']['udp']:
+                                                            if port == udp_port:
+                                                                port_match = True
+                                                                break
+
+                                                if port_match == False:
+                                                    warn(Fore.YELLOW + '[' + Style.BRIGHT + tag + Style.NORMAL + '] Scan cannot be run against {protocol} port {port}. Skipping.' + Fore.RESET)
+                                                    continue
+
+                                            if 'run_once' in scan and scan['run_once'] == True:
+                                                scan_tuple = (name,)
+                                                if scan_tuple in target.scans:
+                                                    warn(Fore.YELLOW + '[' + Style.BRIGHT + tag + ' on ' + address + Style.NORMAL + '] Scan should only be run once and it appears to have already been queued. Skipping.' + Fore.RESET)
+                                                    continue
+                                                else:
+                                                    target.scans.append(scan_tuple)
+                                            else:
+                                                scan_tuple = (protocol, port, service, name)
+                                                if scan_tuple in target.scans:
+                                                    warn(Fore.YELLOW + '[' + Style.BRIGHT + tag + ' on ' + address + Style.NORMAL + '] Scan appears to have already been queued, but it is not marked as run_once in service-scans.toml. Possible duplicate tag? Skipping.' + Fore.RESET)
+                                                    continue
+                                                else:
+                                                    target.scans.append(scan_tuple)
+
+                                            patterns = []
+                                            if 'pattern' in scan:
+                                                patterns = scan['pattern']
+
+                                            pending.add(asyncio.ensure_future(run_cmd(semaphore, e(command), target, tag=tag, patterns=patterns)))
+
+
+
+
+#####################################################################################################################
+def scan_host(target, concurrent_scans):
+    start_time = time.time()
+    info('Scanning target {byellow}{target.address}{rst}')
+
+    basedir = os.path.abspath(os.path.join(outdir, target.address + srvname))
+    target.basedir = basedir
+    os.makedirs(basedir, exist_ok=True)
+
+    exploitdir = os.path.abspath(os.path.join(basedir, 'exploit'))
+    os.makedirs(exploitdir, exist_ok=True)
+
+    lootdir = os.path.abspath(os.path.join(basedir, 'loot'))
+    os.makedirs(lootdir, exist_ok=True)
+
+    reportdir = os.path.abspath(os.path.join(basedir, 'report'))
+    target.reportdir = reportdir
+    os.makedirs(reportdir, exist_ok=True)
+
+    open(os.path.abspath(os.path.join(reportdir, 'local.txt')), 'a').close()
+    open(os.path.abspath(os.path.join(reportdir, 'proof.txt')), 'a').close()
+
+    screenshotdir = os.path.abspath(os.path.join(reportdir, 'screenshots'))
+    os.makedirs(screenshotdir, exist_ok=True)
+
+    scandir = os.path.abspath(os.path.join(basedir, 'scans'))
+    target.scandir = scandir
+    os.makedirs(scandir, exist_ok=True)
+
+    os.makedirs(os.path.abspath(os.path.join(scandir, 'xml')), exist_ok=True)
+
+    # Use a lock when writing to specific files that may be written to by other asynchronous functions.
+    target.lock = asyncio.Lock()
+
+    # Get event loop for current process.
+    loop = asyncio.get_event_loop()
+
+    # Create a semaphore to limit number of concurrent scans.
+    semaphore = asyncio.Semaphore(concurrent_scans)
+
+    try:
+        loop.run_until_complete(scan_services(loop, semaphore, target))
+        elapsed_time = calculate_elapsed_time(start_time)
+        info('Finished scanning target {byellow}{target.address}{rst} in {elapsed_time}')
+    except KeyboardInterrupt:
+        sys.exit(1)
+
+
+
+
+#####################################################################################################################
+class Target:
+    def __init__(self, address):
+        self.address = address
+        self.basedir = ''
+        self.reportdir = ''
+        self.scandir = ''
+        self.scans = []
+        self.lock = None
+        self.running_tasks = []
+
+
+
+
+#####################################################################################################################
+def isRoot():
+    if os.geteuid() != 0:
+        error("You need root permissions.")
+        return False
+    return True
+
+
+
+#####################################################################################################################
+def createProjectDirStructure(projName, workingDir, analyze):
+        global ProjectDir, CommandsDir, DatabaseDir, LogsDir, ReportDir, TargetsDir, LogsFile
+        global DatabaseFile, FinalReportMDFile, FinalReportHTMLFile
+
+        ProjectDir = os.path.join(workingDir, projName)
+        CommandsDir = os.path.join(ProjectDir, 'commands')
+        DatabaseDir = os.path.join(ProjectDir, 'db')
+        LogsDir = os.path.join(ProjectDir, 'logs')
+        ReportDir = os.path.join(ProjectDir, 'report')
+        TargetsDir = os.path.join(ProjectDir, 'targets')
+        LogsFile = os.path.join(LogsDir, "{0}-logs-{1}.txt".format(projName, CurrentDateTime) )
+        DatabaseFile = os.path.join(DatabaseDir, "{0}-database-{1}.db".format(projName, CurrentDateTime))
+        FinalReportMDFile = os.path.join(ReportDir, "{0}-final-report-{1}.md".format(projName, CurrentDateTime))
+        FinalReportHTMLFile = FinalReportMDFile.replace('.md', '.html')
+
+        if not analyze:
+            info('Creating project directory structure \'{byellow}{ProjectDir}{rst}\'.')
+            Path(CommandsDir).mkdir(parents=True, exist_ok=True)
+            Path(DatabaseDir).mkdir(parents=True, exist_ok=True)
+            Path(LogsDir).mkdir(parents=True, exist_ok=True)
+            Path(ReportDir).mkdir(parents=True, exist_ok=True)
+            Path(TargetsDir).mkdir(parents=True, exist_ok=True)
+
+
+
+#####################################################################################################################
+def dbconnect(analyze):
+    global DbConnection
+
+    try:
+        DbConnection = sqlite3.connect(DatabaseFile)
+        if not analyze:
+            dbcreateLiveHostsTbl()
+            dbcreateTopTcpPortsTbl()
+            dbcreateTopUdpPortsTbl()
+
+        info('Database connection established. Database file \'{byellow}{DatabaseFile}{rst}\'.')
+    except Exception as e:
+        error("An error occured during sqlite3 database connection: {0}.".format(str(e)))
+        if DbConnection:
+            DbConnection.close()
+        exit(1)
+
+def dbdisconnect():
+    global DbConnection
+
+    try:
+        if DbConnection:
+            DbConnection.close()
+            info('Database connection terminated.')
+    except Exception as e:
+        error("An error occured during sqlite3 database connection: {0}.".format(str(e)))
+        exit(1)
+
+def dbaddLiveHost(liveHost):
+    global DbConnection
+
+    try:
+        if DbConnection:
+            c = DbConnection.cursor()
+            c.execute('''REPLACE INTO live_hosts(Ipaddr) 
+                VALUES(?);''', [liveHost])
+            DbConnection.commit()
+            id = c.lastrowid
+            c.close()
+            return id
+    except Exception as e:
+        error("An error occured during database data insertion: {0}.".format(str(e)))
+        exit(1)
+
+def dbaddTopTcpPort(host, ports):
+    global DbConnection
+
+    try:
+        if DbConnection:
+            c = DbConnection.cursor()
+            c.execute('''REPLACE INTO top_tcp_ports(Ipaddr,Ports) 
+                VALUES(?,?);''', (host,ports))
+            DbConnection.commit()
+            id = c.lastrowid
+            c.close()
+            return id
+    except Exception as e:
+        error("An error occured during database data insertion: {0}.".format(str(e)))
+        exit(1)
+
+def dbaddTopUdpPort(host, ports):
+    global DbConnection
+
+    try:
+        if DbConnection:
+            c = DbConnection.cursor()
+            c.execute('''REPLACE INTO top_udp_ports(Ipaddr,Ports) 
+                VALUES(?,?);''', (host,ports))
+            DbConnection.commit()
+            id = c.lastrowid
+            c.close()
+            return id
+    except Exception as e:
+        error("An error occured during database data insertion: {0}.".format(str(e)))
+        exit(1)
+
+def dbgetLiveHosts():
+    global DbConnection
+
+    try:
+        if DbConnection:
+            c = DbConnection.cursor()
+            c.execute('''SELECT Ipaddr from live_hosts;''')
+            DbConnection.commit()
+            rows = c.fetchall()
+            c.close()
+            return rows
+    except Exception as e:
+        error("An error occured during database data selection: {0}.".format(str(e)))
+        exit(1)
+
+def dbcreateLiveHostsTbl():
+    global DbConnection
+
+    try:
+        if DbConnection:
+            DbConnection.execute('''CREATE TABLE live_hosts
+             (ID INTEGER PRIMARY KEY AUTOINCREMENT,
+             Ipaddr VARCHAR(50) UNIQUE NOT NULL);''')
+    except Exception as e:
+        error("An error occured during database table creation: {0}.".format(str(e)))
+        exit(1)
+
+def dbcreateTopTcpPortsTbl():
+    global DbConnection
+
+    try:
+        if DbConnection:
+            DbConnection.execute('''CREATE TABLE top_tcp_ports
+             (ID INTEGER PRIMARY KEY AUTOINCREMENT,
+             Ipaddr VARCHAR(50) UNIQUE NOT NULL, 
+             Ports TEXT NOT NULL);''')
+    except Exception as e:
+        error("An error occured during database table creation: {0}.".format(str(e)))
+        exit(1)
+
+def dbcreateTopUdpPortsTbl():
+    global DbConnection
+
+    try:
+        if DbConnection:
+            DbConnection.execute('''CREATE TABLE top_udp_ports
+             (ID INTEGER PRIMARY KEY AUTOINCREMENT,
+             Ipaddr VARCHAR(50) UNIQUE NOT NULL, 
+             Ports TEXT NOT NULL);''')
+    except Exception as e:
+        error("An error occured during database table creation: {0}.".format(str(e)))
+        exit(1)
+
 
 
 #####################################################################################################################
 if __name__ == '__main__':
 
-	print(message)
+    #print intelspy message
+    print(message)
+    start_time = time.time()
 
-	parser = argparse.ArgumentParser()
-	parser.add_argument('-t', '--target', metavar='<host or IP range>', help='target IP or IP range', required=True)
-	parser.add_argument('-p', '--project-name', help='project name', required=True)
-	parser.add_argument('-w', '--working-dir', help='working directory', required=True)
+    #intespy arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('targets', action='store', help='IP addresses (e.g. 10.0.0.1), CIDR notation (e.g. 10.0.0.1/24), or resolvable hostnames (e.g. example.com) to scan.', nargs="*")
+    parser.add_argument('-ts', '--targets', action='store', type=str, default='', dest='target_file', help='Read targets from file.', required=False)
 
-	parser.add_argument('-s','--speed', help='0-5, set timing template (higher is faster) (default: 4)', required=False, default=4)
-	parser.add_argument('--analyze', metavar='<datetime>', help='analyze results, no scan (e.g. 2020-03-14_18-07-32)', required=False, default=False)
-	parser.add_argument('--exclude', metavar='<host1[,host2][,host3],...>', help='exclude hosts/networks', required=False)
-	parser.add_argument('--top-tcp-ports', metavar='<number>', help='scan <number> most common TCP ports (default: 1000)', required=False, default=1000)
-	parser.add_argument('--top-udp-ports', metavar='<number>', help='scan <number> most common UDP ports (default: 1000)', required=False, default=1000)
+    parser.add_argument('-p', '--project-name', action='store', type=str, help='project name', required=True)
+    parser.add_argument('-w', '--working-dir', action='store', type=str, help='working directory', required=True)
 
-	args,extra = parser.parse_known_args()
-	main(args,extra)
+    parser.add_argument('--analyze', metavar='<datetime>', help='analyze results, no scan (e.g. 2020-03-14_18-07-32)', required=False, default=False)
+    parser.add_argument('--exclude', metavar='<host1[,host2][,host3],...>', help='exclude hosts/networks', required=False)
+
+    parser.add_argument('-ct', '--concurrent-targets', action='store', metavar='<number>', type=int, default=5, help='The maximum number of target hosts to scan concurrently. Default: %(default)s')
+    parser.add_argument('-cs', '--concurrent-scans', action='store', metavar='<number>', type=int, default=10, help='The maximum number of scans to perform per target host. Default: %(default)s')
+    parser.add_argument('--profile', action='store', default='default', dest='profile_name', help='The port scanning profile to use (defined in port-scan-profiles.toml). Default: %(default)s')
+
+    parser.add_argument('--heartbeat', action='store', type=int, default=60, help='Specifies the heartbeat interval (in seconds) for task status messages. Default: %(default)s')
+    parser.add_argument('-v', '--verbose', action='count', default=0, help='Enable verbose output. Repeat for more verbosity.')
+
+    parser.error = lambda s: fail(s[0].upper() + s[1:])
+    args = parser.parse_args()
+    errors = False
+
+    #validate arguments values
+    if args.concurrent_targets <= 0:
+        error('Argument -ch/--concurrent-targets: must be at least 1.')
+        errors = True
+
+    concurrent_scans = args.concurrent_scans
+
+    if concurrent_scans <= 0:
+        error('Argument -ct/--concurrent-scans: must be at least 1.')
+        errors = True
+
+    #check if requested profile scan exists and is valid
+    port_scan_profile = args.profile_name
+
+    found_scan_profile = False
+    for profile in port_scan_profiles_config:
+        if profile == port_scan_profile:
+            found_scan_profile = True
+            for scan in port_scan_profiles_config[profile]:
+                if 'service-detection' not in port_scan_profiles_config[profile][scan]:
+                    error('The {profile}.{scan} scan does not have a defined service-detection section. Every scan must at least have a service-detection section defined with a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the result.')
+                    errors = True
+                else:
+                    if 'command' not in port_scan_profiles_config[profile][scan]['service-detection']:
+                        error('The {profile}.{scan}.service-detection section does not have a command defined. Every service-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the results.')
+                        errors = True
+                    else:
+                        if '{ports}' in port_scan_profiles_config[profile][scan]['service-detection']['command'] and 'port-scan' not in port_scan_profiles_config[profile][scan]:
+                            error('The {profile}.{scan}.service-detection command appears to reference a port list but there is no port-scan section defined in {profile}.{scan}. Define a port-scan section with a command and corresponding pattern that extracts port numbers from the result, or replace the reference with a static list of ports.')
+                            errors = True
+
+                    if 'pattern' not in port_scan_profiles_config[profile][scan]['service-detection']:
+                        error('The {profile}.{scan}.service-detection section does not have a pattern defined. Every service-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the results.')
+                        errors = True
+                    else:
+                        if not all(x in port_scan_profiles_config[profile][scan]['service-detection']['pattern'] for x in ['(?P<port>', '(?P<protocol>', '(?P<service>']):
+                            error('The {profile}.{scan}.service-detection pattern does not contain one or more of the following matching groups: port, protocol, service. Ensure that all three of these matching groups are defined and capture the relevant data, e.g. (?P<port>\d+)')
+                            errors = True
+
+                if 'port-scan' in port_scan_profiles_config[profile][scan]:
+                    if 'command' not in port_scan_profiles_config[profile][scan]['port-scan']:
+                        error('The {profile}.{scan}.port-scan section does not have a command defined. Every port-scan section must have a command and a corresponding pattern that extracts the port from the results.')
+                        errors = True
+
+                    if 'pattern' not in port_scan_profiles_config[profile][scan]['port-scan']:
+                        error('The {profile}.{scan}.port-scan section does not have a pattern defined. Every port-scan section must have a command and a corresponding pattern that extracts the port from the results.')
+                        errors = True
+                    else:
+                        if '(?P<port>' not in port_scan_profiles_config[profile][scan]['port-scan']['pattern']:
+                            error('The {profile}.{scan}.port-scan pattern does not contain a port matching group. Ensure that the port matching group is defined and captures the relevant data, e.g. (?P<port>\d+)')
+                            errors = True
+            break
+
+    if not found_scan_profile:
+        error('Argument --profile: must reference a port scan profile defined in {port_scan_profiles_config_file}. No such profile found: {port_scan_profile}')
+        errors = True
+
+    if args.analyze:
+        CurrentDateTime = args.analyze
+
+    createProjectDirStructure(args.project_name, args.working_dir, args.analyze)
+
+    dbconnect(args.analyze)
+
+    if not isRoot():
+        dbdisconnect()
+        sys.exit(1)
+
+    warn('Running with root privileges.')
+
+    #keep user updated every heartbeat_interval seconds
+    heartbeat_interval = args.heartbeat
+    srvname = ''
+    verbose = args.verbose
+
+    #define target/s
+    raw_targets = args.targets
+    targets = []
+
+    info("Excluding from scans: {0}.".format(args.exclude))
+
+    #load targets from file
+    if len(args.target_file) > 0:
+        if not os.path.isfile(args.target_file):
+            error('The target file {args.target_file} was not found.')
+            sys.exit(1)
+        try:
+            with open(args.target_file, 'r') as f:
+                lines = f.read()
+                for line in lines.splitlines():
+                    line = line.strip()
+                    if line.startswith('#') or len(line) == 0: continue
+                    if line not in raw_targets:
+                        raw_targets.append(line)
+        except OSError:
+            error('The target file {args.target_file} could not be read.')
+            sys.exit(1)
+
+
+    for target in raw_targets:
+        try:
+            #single ip address e.g. 192.168.1.10
+            ip = str(ipaddress.ip_address(target))
+
+            if ip not in targets:
+                targets.append(ip)
+        except ValueError:
+
+            try:
+                #ip range(CIDR) e.g. 192.168.1.0/24
+                target_range = ipaddress.ip_network(target, strict=False)
+                for ip in target_range.hosts():
+                    ip = str(ip)
+                    if ip not in targets:
+                        targets.append(ip)
+            except ValueError:
+
+                try:
+                    #domain e.g. example.com
+                    ip = socket.gethostbyname(target)
+
+                    if target not in targets:
+                        targets.append(target)
+                except socket.gaierror:
+                    error(target + ' does not appear to be a valid IP address, IP range, or resolvable hostname.')
+                    errors = True
+
+    if len(targets) == 0:
+        error('You must specify at least one target to scan!')
+        errors = True
+
+    if errors:
+        sys.exit(1)
+
+    #scans
+    # with ProcessPoolExecutor(max_workers=args.concurrent_targets) as executor:
+    #     start_time = time.time()
+    #     futures = []
+
+    #     for address in targets:
+    #         target = Target(address)
+    #         futures.append(executor.submit(scan_host, target, concurrent_scans))
+
+    #     try:
+    #         for future in as_completed(futures):
+    #             future.result()
+    #     except KeyboardInterrupt:
+    #         for future in futures:
+    #             future.cancel()
+    #         executor.shutdown(wait=False)
+    #         sys.exit(1)
+
+    #     elapsed_time = calculate_elapsed_time(start_time)
+    #     info('{bgreen}Finished scanning all targets in {elapsed_time}!{rst}')
+
+    dbdisconnect()
+    elapsed_time = calculate_elapsed_time(start_time)
+    info('{bgreen}IntelSpy completed in {elapsed_time}!{rst}')
