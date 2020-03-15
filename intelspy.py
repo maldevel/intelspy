@@ -113,6 +113,10 @@ CurrentDateTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 DbConnection = None
 
+concurrent_scans = 1
+concurrent_targets = 1
+
+
 #####################################################################################################################
 
 def e(*args, frame_index=1, **kvargs):
@@ -719,35 +723,45 @@ async def scan_services(loop, semaphore, target):
 
 
 #####################################################################################################################
+def scan_live_hosts(target, concurrent_scans):
+    start_time = time.time()
+    info('Scanning target {byellow}{target}{rst} for live hosts')
+
+    livehostsdir = os.path.join(TargetsDir, target.replace('/', '_'), 'scans', 'live-hosts')
+    Path(livehostsdir).mkdir(parents=True, exist_ok=True)
+
+
+
+#####################################################################################################################
 def scan_host(target, concurrent_scans):
     start_time = time.time()
     info('Scanning target {byellow}{target.address}{rst}')
 
-    basedir = os.path.abspath(os.path.join(outdir, target.address + srvname))
-    target.basedir = basedir
-    os.makedirs(basedir, exist_ok=True)
+    #basedir = os.path.abspath(os.path.join(outdir, target.address + srvname))
+    #target.basedir = basedir
+    #os.makedirs(basedir, exist_ok=True)
 
-    exploitdir = os.path.abspath(os.path.join(basedir, 'exploit'))
-    os.makedirs(exploitdir, exist_ok=True)
+    #exploitdir = os.path.abspath(os.path.join(basedir, 'exploit'))
+    #os.makedirs(exploitdir, exist_ok=True)
 
-    lootdir = os.path.abspath(os.path.join(basedir, 'loot'))
-    os.makedirs(lootdir, exist_ok=True)
+    #lootdir = os.path.abspath(os.path.join(basedir, 'loot'))
+    #os.makedirs(lootdir, exist_ok=True)
 
-    reportdir = os.path.abspath(os.path.join(basedir, 'report'))
-    target.reportdir = reportdir
-    os.makedirs(reportdir, exist_ok=True)
+    #reportdir = os.path.abspath(os.path.join(basedir, 'report'))
+    #target.reportdir = reportdir
+    #os.makedirs(reportdir, exist_ok=True)
 
-    open(os.path.abspath(os.path.join(reportdir, 'local.txt')), 'a').close()
-    open(os.path.abspath(os.path.join(reportdir, 'proof.txt')), 'a').close()
+    #open(os.path.abspath(os.path.join(reportdir, 'local.txt')), 'a').close()
+    #open(os.path.abspath(os.path.join(reportdir, 'proof.txt')), 'a').close()
 
-    screenshotdir = os.path.abspath(os.path.join(reportdir, 'screenshots'))
-    os.makedirs(screenshotdir, exist_ok=True)
+    #screenshotdir = os.path.abspath(os.path.join(reportdir, 'screenshots'))
+    #os.makedirs(screenshotdir, exist_ok=True)
 
-    scandir = os.path.abspath(os.path.join(basedir, 'scans'))
-    target.scandir = scandir
-    os.makedirs(scandir, exist_ok=True)
+    #scandir = os.path.abspath(os.path.join(basedir, 'scans'))
+    #target.scandir = scandir
+    #os.makedirs(scandir, exist_ok=True)
 
-    os.makedirs(os.path.abspath(os.path.join(scandir, 'xml')), exist_ok=True)
+    #os.makedirs(os.path.abspath(os.path.join(scandir, 'xml')), exist_ok=True)
 
     # Use a lock when writing to specific files that may be written to by other asynchronous functions.
     target.lock = asyncio.Lock()
@@ -772,13 +786,12 @@ def scan_host(target, concurrent_scans):
 class Target:
     def __init__(self, address):
         self.address = address
-        self.basedir = ''
-        self.reportdir = ''
-        self.scandir = ''
+        #self.basedir = ''
+        #self.reportdir = ''
+        self.scansdir = ''
         self.scans = []
         self.lock = None
         self.running_tasks = []
-
 
 
 
@@ -950,6 +963,31 @@ def dbcreateTopUdpPortsTbl():
 
 
 #####################################################################################################################
+def detect_live_hosts(target):
+    #scans
+    with ProcessPoolExecutor(max_workers=concurrent_targets) as executor:
+        start_time = time.time()
+        futures = []
+
+        #for address in targets:
+        #    target = Target(address)
+        futures.append(executor.submit(scan_live_hosts, target, concurrent_scans))
+
+        try:
+            for future in as_completed(futures):
+                future.result()
+        except KeyboardInterrupt:
+            for future in futures:
+                future.cancel()
+            executor.shutdown(wait=False)
+            sys.exit(1)
+
+        elapsed_time = calculate_elapsed_time(start_time)
+        info('{bgreen}Live Hosts scanning completed in {elapsed_time}!{rst}')
+
+
+
+#####################################################################################################################
 if __name__ == '__main__':
 
     #print intelspy message
@@ -978,15 +1016,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
     errors = False
 
+    concurrent_targets = args.concurrent_targets
+
     #validate arguments values
-    if args.concurrent_targets <= 0:
-        error('Argument -ch/--concurrent-targets: must be at least 1.')
+    if concurrent_targets <= 0:
+        error('Argument -ct/--concurrent-targets: must be at least 1.')
         errors = True
 
     concurrent_scans = args.concurrent_scans
 
     if concurrent_scans <= 0:
-        error('Argument -ct/--concurrent-scans: must be at least 1.')
+        error('Argument -cs/--concurrent-scans: must be at least 1.')
         errors = True
 
     #check if requested profile scan exists and is valid
@@ -1048,6 +1088,9 @@ if __name__ == '__main__':
 
     warn('Running with root privileges.')
 
+    info('Concurrent targets {concurrent_targets}')
+    info('Concurrent scans {concurrent_scans}')
+
     #keep user updated every heartbeat_interval seconds
     heartbeat_interval = args.heartbeat
     srvname = ''
@@ -1061,9 +1104,11 @@ if __name__ == '__main__':
 
     #load targets from file
     if len(args.target_file) > 0:
+
         if not os.path.isfile(args.target_file):
             error('The target file {args.target_file} was not found.')
             sys.exit(1)
+
         try:
             with open(args.target_file, 'r') as f:
                 lines = f.read()
@@ -1089,10 +1134,12 @@ if __name__ == '__main__':
             try:
                 #ip range(CIDR) e.g. 192.168.1.0/24
                 target_range = ipaddress.ip_network(target, strict=False)
-                for ip in target_range.hosts():
-                    ip = str(ip)
-                    if ip not in targets:
-                        targets.append(ip)
+                live_hosts = detect_live_hosts(target)
+                #for ip in target_range.hosts():
+                #for ip in live_hosts:
+                #    ip = str(ip)
+                #    if ip not in targets:
+                #        targets.append(ip)
             except ValueError:
 
                 try:
