@@ -83,8 +83,9 @@ https://github.com/maldevel/intelspy
 
 usage: intelspy.py [-h] [-ts TARGET_FILE] -p PROJECT_NAME -w WORKING_DIR
                    [--analyze <datetime>]
-                   [--exclude <host1[,host2][,host3],...>] [-ct <number>]
-                   [-cs <number>] [--profile PROFILE_NAME]
+                   [--exclude <host1[,host2][,host3],...>] [-s SPEED]
+                   [-ct <number>] [-cs <number>] [--profile PROFILE_NAME]
+                   [--livehost-profile LIVEHOST_PROFILE_NAME]
                    [--heartbeat HEARTBEAT] [-v]
                    [targets [targets ...]]
 
@@ -104,6 +105,9 @@ optional arguments:
   --analyze <datetime>  analyze results, no scan (e.g. 2020-03-14_18-07-32)
   --exclude <host1[,host2][,host3],...>
                         exclude hosts/networks
+  -s SPEED, --speed SPEED
+                        0-5, set timing template (higher is faster) (default:
+                        4)
   -ct <number>, --concurrent-targets <number>
                         The maximum number of target hosts to scan
                         concurrently. Default: 5
@@ -113,6 +117,9 @@ optional arguments:
   --profile PROFILE_NAME
                         The port scanning profile to use (defined in port-
                         scan-profiles.toml). Default: default
+  --livehost-profile LIVEHOST_PROFILE_NAME
+                        The live host scanning profile to use (defined in
+                        live-host-scan-profiles.toml). Default: default
   --heartbeat HEARTBEAT
                         Specifies the heartbeat interval (in seconds) for task
                         status messages. Default: 60
