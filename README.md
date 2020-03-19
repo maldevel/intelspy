@@ -10,6 +10,12 @@ The tool will also launch further enumeration scans for each detected service us
 
 ---
 
+### Credits
+
+I had started working on IntelSpy when one day I discovered [AutoRecon](https://github.com/Tib3rius/AutoRecon). Instead of reinventing the wheel, IntelSpy is the result of combining/merging IntelSpy with the best features of the AutoRecon to create a network reconnaissance tool suitable for Penetration Testing engagements.
+
+---
+
 ### Features
 
 * Scans multiple targets in the form of IP addresses, IP ranges (CIDR notation) and resolvable hostnames.
