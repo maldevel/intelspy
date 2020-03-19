@@ -1,0 +1,13 @@
+[default]
+
+	[default.nmap-icmp-echo]
+
+		[default.nmap-icmp-echo.live-host-detection]
+		command = 'nmap {nmap_extra} -vv -n -sn -PE -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_icmp_echo" {address}'
+		pattern = '^Nmap scan report for (?P<address>[\d\.]+)$'
+
+#    [default.nmap-top-100-tcp]
+#
+#        [default.nmap-top-100-tcp.live-host-detection]
+#        command = 'nmap {nmap_extra} -sS -sV -n -Pn -vv --top-ports 100 --reason --open -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_top_100_tcp" {address}'
+#        pattern = '^(?P<port>\d+)\/(?P<protocol>(tcp|udp))(.*)open(\s*)(?P<service>[\w\-\/]+)(\s*)(.*)$'

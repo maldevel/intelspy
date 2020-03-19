@@ -86,11 +86,15 @@ atexit.register(_quit)
 TERM_FLAGS = termios.tcgetattr(sys.stdin.fileno())
 
 verbose = 0
-nmap = '-vv --reason -Pn'
+speed = 4
+#nmap = '-vv --reason -Pn'
+nmap = ''
 srvname = ''
 heartbeat_interval = 60
 port_scan_profile = None
+live_host_scan_profile = None
 
+live_host_scan_profiles_config = None
 port_scan_profiles_config = None
 service_scans_config = None
 global_patterns = []
@@ -115,6 +119,8 @@ DbConnection = None
 
 concurrent_scans = 1
 concurrent_targets = 1
+
+analyze_only = False
 
 
 #####################################################################################################################
@@ -186,6 +192,7 @@ def cprint(*args, type='info', color=Fore.RESET, char='*', sep=' ', end='\n', fr
             logStr = re.sub(r"\[[0-9]{1,2}m", "", logStr)
             logFile.write("[{0} {1}] {2} Type={3} Log=\"{4}\"\n".format(ts,tz,hostname,type,logStr))
     except Exception as e:
+        #print(e)
         sys.exit(1)
 
 
@@ -242,6 +249,18 @@ def calculate_elapsed_time(start_time):
 
 #####################################################################################################################
 port_scan_profiles_config_file = 'port-scan-profiles.toml'
+live_host_scan_profiles_config_file = 'live-host-scan-profiles.toml'
+
+with open(os.path.join(RootDir, 'config', live_host_scan_profiles_config_file), 'r') as p:
+    try:
+        live_host_scan_profiles_config = toml.load(p)
+
+        if len(live_host_scan_profiles_config) == 0:
+            fail('There do not appear to be any port scan profiles configured in the {live_host_scan_profiles_config_file} config file.')
+
+    except toml.decoder.TomlDecodeError as e:
+        fail('Error: Couldn\'t parse {live_host_scan_profiles_config_file} config file. Check syntax and duplicate tags.')
+
 with open(os.path.join(RootDir, 'config', port_scan_profiles_config_file), 'r') as p:
     try:
         port_scan_profiles_config = toml.load(p)
@@ -297,14 +316,14 @@ async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.scandir, '_patterns.log'), 'a') as file:
+                            with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
                                 file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
                 else:
                     for match in matches:
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.scandir, '_patterns.log'), 'a') as file:
+                            with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
                                 file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
 
             for p in patterns:
@@ -314,14 +333,14 @@ async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.scandir, '_patterns.log'), 'a') as file:
+                            with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
                                 file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
                 else:
                     for match in matches:
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.scandir, '_patterns.log'), 'a') as file:
+                            with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
                                 file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
         else:
             break
@@ -333,7 +352,7 @@ async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
 async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
     async with semaphore:
         address = target.address
-        scandir = target.scandir
+        scandir = target.scansdir
 
         info('Running task {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{cmd}{rst}' if verbose >= 1 else ''))
 
@@ -392,20 +411,58 @@ async def parse_port_scan(stream, tag, target, pattern):
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.scandir, '_patterns.log'), 'a') as file:
+                            with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
                                 file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
                 else:
                     for match in matches:
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.scandir, '_patterns.log'), 'a') as file:
+                            with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
                                 file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
         else:
             break
 
     return ports
 
+
+
+
+#####################################################################################################################
+async def parse_live_host_detection(stream, tag, target, pattern):
+    address = target.address
+    livehosts = []
+
+    while True:
+        line = await stream.readline()
+        if line:
+            line = str(line.rstrip(), 'utf8', 'ignore')
+            debug(Fore.BLUE + '[' + Style.BRIGHT + address + ' ' + tag + Style.NORMAL + '] ' + Fore.RESET + '{line}', color=Fore.BLUE)
+
+            parse_match = re.search(pattern, line)
+            if parse_match:
+                livehosts.append(parse_match.group('address'))
+
+            # for p in global_patterns:
+            #     matches = re.findall(p['pattern'], line)
+            #     if 'description' in p:
+            #         for match in matches:
+            #             if verbose >= 1:
+            #                 info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
+            #             async with target.lock:
+            #                 with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
+            #                     file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
+            #     else:
+            #         for match in matches:
+            #             if verbose >= 1:
+            #                 info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
+            #             async with target.lock:
+            #                 with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
+            #                     file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
+        else:
+            break
+
+    return livehosts
 
 
 
@@ -431,14 +488,14 @@ async def parse_service_detection(stream, tag, target, pattern):
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.scandir, '_patterns.log'), 'a') as file:
+                            with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
                                 file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
                 else:
                     for match in matches:
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.scandir, '_patterns.log'), 'a') as file:
+                            with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
                                 file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
         else:
             break
@@ -449,11 +506,62 @@ async def parse_service_detection(stream, tag, target, pattern):
 
 
 #####################################################################################################################
+async def run_livehostscan(semaphore, tag, target, live_host_detection):
+    async with semaphore:
+
+        address = target.address
+        scandir = target.scansdir
+        nmap_speed = target.speed
+        nmap_extra = nmap
+
+        command = e(live_host_detection[0])
+        pattern = live_host_detection[1]
+
+        info('Running live hosts detection {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{command}{rst}' if verbose >= 1 else ''))
+
+        async with target.lock:
+            with open(os.path.join(scandir, '_commands.log'), 'a') as file:
+                file.writelines(e('{command}\n\n'))
+
+        start_time = time.time()
+        process = await asyncio.create_subprocess_shell(command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, executable='/bin/bash')
+        async with target.lock:
+            target.running_tasks.append(tag)
+
+        output = [
+            parse_live_host_detection(process.stdout, tag, target, pattern),
+            read_stream(process.stderr, target, tag=tag, color=Fore.RED)
+        ]
+
+        results = await asyncio.gather(*output)
+
+        await process.wait()
+        async with target.lock:
+            target.running_tasks.remove(tag)
+
+        elapsed_time = calculate_elapsed_time(start_time)
+
+        if process.returncode != 0:
+            error('Live hosts detection {bred}{tag}{rst} on {byellow}{address}{rst} returned non-zero exit code: {process.returncode}')
+            async with target.lock:
+                with open(os.path.join(scandir, '_errors.log'), 'a') as file:
+                    file.writelines(e('[*] Live host detection {tag} returned non-zero exit code: {process.returncode}. Command: {command}\n'))
+        else:
+            info('Live hosts detection {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
+
+        livehosts = results[0]
+
+        return {'returncode': process.returncode, 'name': 'run_livehostscan', 'livehosts': livehosts}
+
+
+
+
+#####################################################################################################################
 async def run_portscan(semaphore, tag, target, service_detection, port_scan=None):
     async with semaphore:
 
         address = target.address
-        scandir = target.scandir
+        scandir = target.scansdir
         nmap_extra = nmap
 
         ports = ''
@@ -563,17 +671,65 @@ async def start_heartbeat(target, period=60):
 
 
 #####################################################################################################################
+async def ping_and_scan(loop, semaphore, target):
+    address = target.address
+    scandir = target.scansdir
+    pending = []
+
+    heartbeat = loop.create_task(start_heartbeat(target, period=heartbeat_interval))
+
+    for profile in live_host_scan_profiles_config:
+        if profile == port_scan_profile:    #default: default
+
+            for scan in live_host_scan_profiles_config[profile]:
+
+                live_host_detection = (live_host_scan_profiles_config[profile][scan]['live-host-detection']['command'], live_host_scan_profiles_config[profile][scan]['live-host-detection']['pattern'])
+                pending.append(run_livehostscan(semaphore, scan, target, live_host_detection))
+            break
+
+    live_hosts = []
+
+    while True:
+        if not pending:
+            heartbeat.cancel()
+            break
+
+        done, pending = await asyncio.wait(pending, return_when=FIRST_COMPLETED)
+
+        for task in done:
+            result = task.result()
+
+            if result['returncode'] == 0:
+                if result['name'] == 'run_livehostscan':
+                    for livehost in result['livehosts']:
+                        if livehost not in live_hosts:
+                            live_hosts.append(livehost)
+                        else:
+                            continue
+
+                        info('Found live host {bmagenta}{livehost}{rst} on target {byellow}{address}{rst}')
+
+                        with open(os.path.join(target.reportdir, 'notes.txt'), 'a') as file:
+                            file.writelines(e('[*] Live host {livehost} found on target {address}.\n\n'))
+    return live_hosts
+
+
+
+#####################################################################################################################
 async def scan_services(loop, semaphore, target):
     address = target.address
-    scandir = target.scandir
+    scandir = target.scansdir
     pending = []
 
     heartbeat = loop.create_task(start_heartbeat(target, period=heartbeat_interval))
 
     for profile in port_scan_profiles_config:
-        if profile == port_scan_profile:
+        if profile == port_scan_profile:    #default: default
+
             for scan in port_scan_profiles_config[profile]:
+
                 service_detection = (port_scan_profiles_config[profile][scan]['service-detection']['command'], port_scan_profiles_config[profile][scan]['service-detection']['pattern'])
+                
                 if 'port-scan' in port_scan_profiles_config[profile][scan]:
                     port_scan = (port_scan_profiles_config[profile][scan]['port-scan']['command'], port_scan_profiles_config[profile][scan]['port-scan']['pattern'])
                     pending.append(run_portscan(semaphore, scan, target, service_detection, port_scan))
@@ -725,10 +881,33 @@ async def scan_services(loop, semaphore, target):
 #####################################################################################################################
 def scan_live_hosts(target, concurrent_scans):
     start_time = time.time()
-    info('Scanning target {byellow}{target}{rst} for live hosts')
+    info('Scanning target {byellow}{target.address}{rst} for live hosts')
 
-    livehostsdir = os.path.join(TargetsDir, target.replace('/', '_'), 'scans', 'live-hosts')
-    Path(livehostsdir).mkdir(parents=True, exist_ok=True)
+    livehostsdir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'scans', 'live-hosts')
+    target.scansdir = livehostsdir
+    reportdir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'report')
+    target.reportdir = reportdir
+
+    if not analyze_only:
+        Path(livehostsdir).mkdir(parents=True, exist_ok=True)
+        Path(reportdir).mkdir(parents=True, exist_ok=True)
+
+    # Use a lock when writing to specific files that may be written to by other asynchronous functions.
+    target.lock = asyncio.Lock()
+
+    # Get event loop for current process.
+    loop = asyncio.get_event_loop()
+
+    # Create a semaphore to limit number of concurrent scans.
+    semaphore = asyncio.Semaphore(concurrent_scans)
+
+    try:
+        live_hosts = loop.run_until_complete(asyncio.gather(ping_and_scan(loop, semaphore, target)))
+        elapsed_time = calculate_elapsed_time(start_time)
+        info('Finished scanning target {byellow}{target.address}{rst} in {elapsed_time}')
+        return live_hosts
+    except KeyboardInterrupt:
+        sys.exit(1)
 
 
 
@@ -737,31 +916,11 @@ def scan_host(target, concurrent_scans):
     start_time = time.time()
     info('Scanning target {byellow}{target.address}{rst}')
 
-    #basedir = os.path.abspath(os.path.join(outdir, target.address + srvname))
-    #target.basedir = basedir
-    #os.makedirs(basedir, exist_ok=True)
+    scandir = os.path.join(TargetsDir, target.replace('/', '_'), 'scans')
+    target.scansdir = scandir
 
-    #exploitdir = os.path.abspath(os.path.join(basedir, 'exploit'))
-    #os.makedirs(exploitdir, exist_ok=True)
-
-    #lootdir = os.path.abspath(os.path.join(basedir, 'loot'))
-    #os.makedirs(lootdir, exist_ok=True)
-
-    #reportdir = os.path.abspath(os.path.join(basedir, 'report'))
-    #target.reportdir = reportdir
-    #os.makedirs(reportdir, exist_ok=True)
-
-    #open(os.path.abspath(os.path.join(reportdir, 'local.txt')), 'a').close()
-    #open(os.path.abspath(os.path.join(reportdir, 'proof.txt')), 'a').close()
-
-    #screenshotdir = os.path.abspath(os.path.join(reportdir, 'screenshots'))
-    #os.makedirs(screenshotdir, exist_ok=True)
-
-    #scandir = os.path.abspath(os.path.join(basedir, 'scans'))
-    #target.scandir = scandir
-    #os.makedirs(scandir, exist_ok=True)
-
-    #os.makedirs(os.path.abspath(os.path.join(scandir, 'xml')), exist_ok=True)
+    if not analyze_only:
+        Path(scandir).mkdir(parents=True, exist_ok=True)
 
     # Use a lock when writing to specific files that may be written to by other asynchronous functions.
     target.lock = asyncio.Lock()
@@ -787,7 +946,8 @@ class Target:
     def __init__(self, address):
         self.address = address
         #self.basedir = ''
-        #self.reportdir = ''
+        self.reportdir = ''
+        self.speed = speed
         self.scansdir = ''
         self.scans = []
         self.lock = None
@@ -821,12 +981,12 @@ def createProjectDirStructure(projName, workingDir, analyze):
         FinalReportHTMLFile = FinalReportMDFile.replace('.md', '.html')
 
         if not analyze:
-            info('Creating project directory structure \'{byellow}{ProjectDir}{rst}\'.')
             Path(CommandsDir).mkdir(parents=True, exist_ok=True)
             Path(DatabaseDir).mkdir(parents=True, exist_ok=True)
             Path(LogsDir).mkdir(parents=True, exist_ok=True)
             Path(ReportDir).mkdir(parents=True, exist_ok=True)
             Path(TargetsDir).mkdir(parents=True, exist_ok=True)
+            info('Creating project directory structure \'{byellow}{ProjectDir}{rst}\'.')
 
 
 
@@ -963,27 +1123,147 @@ def dbcreateTopUdpPortsTbl():
 
 
 #####################################################################################################################
-def detect_live_hosts(target):
+def detect_live_hosts(targetRange):
     #scans
     with ProcessPoolExecutor(max_workers=concurrent_targets) as executor:
         start_time = time.time()
         futures = []
 
         #for address in targets:
-        #    target = Target(address)
-        futures.append(executor.submit(scan_live_hosts, target, concurrent_scans))
+        target = Target(targetRange)
+        #futures.append(executor.submit(scan_live_hosts, target, concurrent_scans))
+        future = executor.submit(scan_live_hosts, target, concurrent_scans)
 
+        live_hosts = []
         try:
-            for future in as_completed(futures):
-                future.result()
+            #for future in as_completed(futures):
+            live_hosts_arr = future.result()
+            live_hosts = live_hosts_arr[0]
         except KeyboardInterrupt:
-            for future in futures:
-                future.cancel()
+            #for future in futures:
+            future.cancel()
             executor.shutdown(wait=False)
             sys.exit(1)
 
         elapsed_time = calculate_elapsed_time(start_time)
         info('{bgreen}Live Hosts scanning completed in {elapsed_time}!{rst}')
+
+        return live_hosts
+
+
+
+#####################################################################################################################
+def findProfile(profileName, configList):
+    #check if requested profile scan exists and is valid
+
+    found_scan_profile = False
+
+    for profile in configList:
+        if profile == profileName:
+            found_scan_profile = True
+
+            for scan in configList[profile]:
+
+                if 'service-detection' not in configList[profile][scan]:
+                    error('The {profile}.{scan} scan does not have a defined service-detection section. Every scan must at least have a service-detection section defined with a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the result.')
+                    errors = True
+                else:
+                    if 'command' not in configList[profile][scan]['service-detection']:
+                        error('The {profile}.{scan}.service-detection section does not have a command defined. Every service-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the results.')
+                        errors = True
+                    else:
+                        if '{ports}' in configList[profile][scan]['service-detection']['command'] and 'port-scan' not in configList[profile][scan]:
+                            error('The {profile}.{scan}.service-detection command appears to reference a port list but there is no port-scan section defined in {profile}.{scan}. Define a port-scan section with a command and corresponding pattern that extracts port numbers from the result, or replace the reference with a static list of ports.')
+                            errors = True
+
+                    if 'pattern' not in configList[profile][scan]['service-detection']:
+                        error('The {profile}.{scan}.service-detection section does not have a pattern defined. Every service-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the results.')
+                        errors = True
+                    else:
+                        if not all(x in configList[profile][scan]['service-detection']['pattern'] for x in ['(?P<port>', '(?P<protocol>', '(?P<service>']):
+                            error('The {profile}.{scan}.service-detection pattern does not contain one or more of the following matching groups: port, protocol, service. Ensure that all three of these matching groups are defined and capture the relevant data, e.g. (?P<port>\d+)')
+                            errors = True
+
+                if 'port-scan' in configList[profile][scan]:
+                    if 'command' not in configList[profile][scan]['port-scan']:
+                        error('The {profile}.{scan}.port-scan section does not have a command defined. Every port-scan section must have a command and a corresponding pattern that extracts the port from the results.')
+                        errors = True
+
+                    if 'pattern' not in configList[profile][scan]['port-scan']:
+                        error('The {profile}.{scan}.port-scan section does not have a pattern defined. Every port-scan section must have a command and a corresponding pattern that extracts the port from the results.')
+                        errors = True
+                    else:
+                        if '(?P<port>' not in configList[profile][scan]['port-scan']['pattern']:
+                            error('The {profile}.{scan}.port-scan pattern does not contain a port matching group. Ensure that the port matching group is defined and captures the relevant data, e.g. (?P<port>\d+)')
+                            errors = True
+
+                if 'live-host-detection' in configList[profile][scan]:
+                    if 'command' not in configList[profile][scan]['live-host-detection']:
+                        error('The {profile}.{scan}.live-host-detection section does not have a command defined. Every live-host-detection section must have a command and a corresponding pattern that extracts the live host from the results.')
+                        errors = True
+
+                    if 'pattern' not in configList[profile][scan]['live-host-detection']:
+                        error('The {profile}.{scan}.plive-host-detection section does not have a pattern defined. Every live-host-detection section must have a command and a corresponding pattern that extracts the live host from the results.')
+                        errors = True
+                    else:
+                        if '(?P<port>' not in configList[profile][scan]['live-host-detection']['pattern']:
+                            error('The {profile}.{scan}.live-host-detection pattern does not contain a port matching group. Ensure that the port matching group is defined and captures the relevant data, e.g. (?P<port>\d+)')
+                            errors = True
+
+            break
+
+    return found_scan_profile
+
+
+
+#####################################################################################################################
+def findLiveHostProfile(profileName, configList):
+    #check if requested profile scan exists and is valid
+
+    found_scan_profile = False
+
+    for profile in configList:
+        if profile == profileName:
+            found_scan_profile = True
+
+            for scan in configList[profile]:
+
+                if 'live-host-detection' not in configList[profile][scan]:
+                    error('The {profile}.{scan} scan does not have a defined live-host-detection section. Every scan must at least have a live-host-detection section defined with a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the result.')
+                    errors = True
+                else:
+                    if 'command' not in configList[profile][scan]['live-host-detection']:
+                        error('The {profile}.{scan}.live-host-detection section does not have a command defined. Every live-host-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the results.')
+                        errors = True
+                    else:
+                        if '{ports}' in configList[profile][scan]['live-host-detection']['command'] and 'port-scan' not in configList[profile][scan]:
+                            error('The {profile}.{scan}.live-host-detection command appears to reference a port list but there is no port-scan section defined in {profile}.{scan}. Define a port-scan section with a command and corresponding pattern that extracts port numbers from the result, or replace the reference with a static list of ports.')
+                            errors = True
+
+                    if 'pattern' not in configList[profile][scan]['live-host-detection']:
+                        error('The {profile}.{scan}.live-host-detection section does not have a pattern defined. Every live-host-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the results.')
+                        errors = True
+                    else:
+                        if not all(x in configList[profile][scan]['live-host-detection']['pattern'] for x in ['(?P<address>']):
+                            error('The {profile}.{scan}.live-host-detection pattern does not contain one or more of the following matching groups: address. Ensure that all three of these matching groups are defined and capture the relevant data, e.g. (?P<port>\d+)')
+                            errors = True
+
+                # if 'port-scan' in configList[profile][scan]:
+                #     if 'command' not in configList[profile][scan]['port-scan']:
+                #         error('The {profile}.{scan}.port-scan section does not have a command defined. Every port-scan section must have a command and a corresponding pattern that extracts the port from the results.')
+                #         errors = True
+
+                #     if 'pattern' not in configList[profile][scan]['port-scan']:
+                #         error('The {profile}.{scan}.port-scan section does not have a pattern defined. Every port-scan section must have a command and a corresponding pattern that extracts the port from the results.')
+                #         errors = True
+                #     else:
+                #         if '(?P<port>' not in configList[profile][scan]['port-scan']['pattern']:
+                #             error('The {profile}.{scan}.port-scan pattern does not contain a port matching group. Ensure that the port matching group is defined and captures the relevant data, e.g. (?P<port>\d+)')
+                #             errors = True
+
+            break
+
+    return found_scan_profile
 
 
 
@@ -1005,9 +1285,12 @@ if __name__ == '__main__':
     parser.add_argument('--analyze', metavar='<datetime>', help='analyze results, no scan (e.g. 2020-03-14_18-07-32)', required=False, default=False)
     parser.add_argument('--exclude', metavar='<host1[,host2][,host3],...>', help='exclude hosts/networks', required=False)
 
+    parser.add_argument('-s','--speed', help='0-5, set timing template (higher is faster) (default: 4)', required=False, default=4)
+
     parser.add_argument('-ct', '--concurrent-targets', action='store', metavar='<number>', type=int, default=5, help='The maximum number of target hosts to scan concurrently. Default: %(default)s')
     parser.add_argument('-cs', '--concurrent-scans', action='store', metavar='<number>', type=int, default=10, help='The maximum number of scans to perform per target host. Default: %(default)s')
     parser.add_argument('--profile', action='store', default='default', dest='profile_name', help='The port scanning profile to use (defined in port-scan-profiles.toml). Default: %(default)s')
+    parser.add_argument('--livehost-profile', action='store', default='default', dest='livehost_profile_name', help='The live host scanning profile to use (defined in live-host-scan-profiles.toml). Default: %(default)s')
 
     parser.add_argument('--heartbeat', action='store', type=int, default=60, help='Specifies the heartbeat interval (in seconds) for task status messages. Default: %(default)s')
     parser.add_argument('-v', '--verbose', action='count', default=0, help='Enable verbose output. Repeat for more verbosity.')
@@ -1017,6 +1300,8 @@ if __name__ == '__main__':
     errors = False
 
     concurrent_targets = args.concurrent_targets
+
+    speed = args.speed
 
     #validate arguments values
     if concurrent_targets <= 0:
@@ -1029,58 +1314,28 @@ if __name__ == '__main__':
         error('Argument -cs/--concurrent-scans: must be at least 1.')
         errors = True
 
-    #check if requested profile scan exists and is valid
     port_scan_profile = args.profile_name
-
-    found_scan_profile = False
-    for profile in port_scan_profiles_config:
-        if profile == port_scan_profile:
-            found_scan_profile = True
-            for scan in port_scan_profiles_config[profile]:
-                if 'service-detection' not in port_scan_profiles_config[profile][scan]:
-                    error('The {profile}.{scan} scan does not have a defined service-detection section. Every scan must at least have a service-detection section defined with a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the result.')
-                    errors = True
-                else:
-                    if 'command' not in port_scan_profiles_config[profile][scan]['service-detection']:
-                        error('The {profile}.{scan}.service-detection section does not have a command defined. Every service-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the results.')
-                        errors = True
-                    else:
-                        if '{ports}' in port_scan_profiles_config[profile][scan]['service-detection']['command'] and 'port-scan' not in port_scan_profiles_config[profile][scan]:
-                            error('The {profile}.{scan}.service-detection command appears to reference a port list but there is no port-scan section defined in {profile}.{scan}. Define a port-scan section with a command and corresponding pattern that extracts port numbers from the result, or replace the reference with a static list of ports.')
-                            errors = True
-
-                    if 'pattern' not in port_scan_profiles_config[profile][scan]['service-detection']:
-                        error('The {profile}.{scan}.service-detection section does not have a pattern defined. Every service-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the results.')
-                        errors = True
-                    else:
-                        if not all(x in port_scan_profiles_config[profile][scan]['service-detection']['pattern'] for x in ['(?P<port>', '(?P<protocol>', '(?P<service>']):
-                            error('The {profile}.{scan}.service-detection pattern does not contain one or more of the following matching groups: port, protocol, service. Ensure that all three of these matching groups are defined and capture the relevant data, e.g. (?P<port>\d+)')
-                            errors = True
-
-                if 'port-scan' in port_scan_profiles_config[profile][scan]:
-                    if 'command' not in port_scan_profiles_config[profile][scan]['port-scan']:
-                        error('The {profile}.{scan}.port-scan section does not have a command defined. Every port-scan section must have a command and a corresponding pattern that extracts the port from the results.')
-                        errors = True
-
-                    if 'pattern' not in port_scan_profiles_config[profile][scan]['port-scan']:
-                        error('The {profile}.{scan}.port-scan section does not have a pattern defined. Every port-scan section must have a command and a corresponding pattern that extracts the port from the results.')
-                        errors = True
-                    else:
-                        if '(?P<port>' not in port_scan_profiles_config[profile][scan]['port-scan']['pattern']:
-                            error('The {profile}.{scan}.port-scan pattern does not contain a port matching group. Ensure that the port matching group is defined and captures the relevant data, e.g. (?P<port>\d+)')
-                            errors = True
-            break
+    found_scan_profile = findProfile(port_scan_profile, port_scan_profiles_config)
 
     if not found_scan_profile:
         error('Argument --profile: must reference a port scan profile defined in {port_scan_profiles_config_file}. No such profile found: {port_scan_profile}')
         errors = True
 
-    if args.analyze:
-        CurrentDateTime = args.analyze
+    live_host_scan_profile = args.livehost_profile_name
+    found_live_host_scan_profile = findLiveHostProfile(live_host_scan_profile, live_host_scan_profiles_config)
 
-    createProjectDirStructure(args.project_name, args.working_dir, args.analyze)
+    if not found_live_host_scan_profile:
+        error('Argument --livehost-profile: must reference a live host scan profile defined in {live_host_scan_profiles_config_file}. No such profile found: {live_host_scan_profile}')
+        errors = True
 
-    dbconnect(args.analyze)
+    analyze_only = args.analyze
+
+    if analyze_only:
+        CurrentDateTime = analyze_only
+
+    createProjectDirStructure(args.project_name, args.working_dir, analyze_only)
+
+    dbconnect(analyze_only)
 
     if not isRoot():
         dbdisconnect()
@@ -1136,10 +1391,11 @@ if __name__ == '__main__':
                 target_range = ipaddress.ip_network(target, strict=False)
                 live_hosts = detect_live_hosts(target)
                 #for ip in target_range.hosts():
-                #for ip in live_hosts:
-                #    ip = str(ip)
-                #    if ip not in targets:
-                #        targets.append(ip)
+                if live_hosts:
+                    for ip in live_hosts:
+                        ip = str(ip)
+                        if ip not in targets:
+                            targets.append(ip)
             except ValueError:
 
                 try:
