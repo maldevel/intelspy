@@ -29,6 +29,7 @@
 # Released under GPL Version 3 License
 # March 2020
 
+
 import atexit
 import argparse
 import asyncio
@@ -114,7 +115,6 @@ DatabaseFile = ''
 FinalReportMDFile = ''
 FinalReportHTMLFile = ''
 CurrentDateTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-
 DbConnection = None
 
 concurrent_scans = 1
@@ -123,8 +123,8 @@ concurrent_targets = 1
 analyze_only = False
 
 
-#####################################################################################################################
 
+#####################################################################################################################
 def e(*args, frame_index=1, **kvargs):
     frame = sys._getframe(frame_index)
 
@@ -214,7 +214,7 @@ def error(*args, sep=' ', end='\n', file=sys.stderr, **kvargs):
 def fail(*args, sep=' ', end='\n', file=sys.stderr, **kvargs):
     cprint(*args, type='failure', color=Fore.RED, char='!', sep=sep, end=end, file=file, frame_index=2, **kvargs)
     exit(-1)
-#####################################################################################################################
+
 
 
 
@@ -442,23 +442,6 @@ async def parse_live_host_detection(stream, tag, target, pattern):
             parse_match = re.search(pattern, line)
             if parse_match:
                 livehosts.append(parse_match.group('address'))
-
-            # for p in global_patterns:
-            #     matches = re.findall(p['pattern'], line)
-            #     if 'description' in p:
-            #         for match in matches:
-            #             if verbose >= 1:
-            #                 info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
-            #             async with target.lock:
-            #                 with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
-            #                     file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
-            #     else:
-            #         for match in matches:
-            #             if verbose >= 1:
-            #                 info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
-            #             async with target.lock:
-            #                 with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
-            #                     file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
         else:
             break
 
@@ -1129,18 +1112,14 @@ def detect_live_hosts(targetRange):
         start_time = time.time()
         futures = []
 
-        #for address in targets:
         target = Target(targetRange)
-        #futures.append(executor.submit(scan_live_hosts, target, concurrent_scans))
         future = executor.submit(scan_live_hosts, target, concurrent_scans)
 
         live_hosts = []
         try:
-            #for future in as_completed(futures):
             live_hosts_arr = future.result()
             live_hosts = live_hosts_arr[0]
         except KeyboardInterrupt:
-            #for future in futures:
             future.cancel()
             executor.shutdown(wait=False)
             sys.exit(1)
@@ -1247,20 +1226,6 @@ def findLiveHostProfile(profileName, configList):
                         if not all(x in configList[profile][scan]['live-host-detection']['pattern'] for x in ['(?P<address>']):
                             error('The {profile}.{scan}.live-host-detection pattern does not contain one or more of the following matching groups: address. Ensure that all three of these matching groups are defined and capture the relevant data, e.g. (?P<port>\d+)')
                             errors = True
-
-                # if 'port-scan' in configList[profile][scan]:
-                #     if 'command' not in configList[profile][scan]['port-scan']:
-                #         error('The {profile}.{scan}.port-scan section does not have a command defined. Every port-scan section must have a command and a corresponding pattern that extracts the port from the results.')
-                #         errors = True
-
-                #     if 'pattern' not in configList[profile][scan]['port-scan']:
-                #         error('The {profile}.{scan}.port-scan section does not have a pattern defined. Every port-scan section must have a command and a corresponding pattern that extracts the port from the results.')
-                #         errors = True
-                #     else:
-                #         if '(?P<port>' not in configList[profile][scan]['port-scan']['pattern']:
-                #             error('The {profile}.{scan}.port-scan pattern does not contain a port matching group. Ensure that the port matching group is defined and captures the relevant data, e.g. (?P<port>\d+)')
-                #             errors = True
-
             break
 
     return found_scan_profile
@@ -1390,7 +1355,7 @@ if __name__ == '__main__':
                 #ip range(CIDR) e.g. 192.168.1.0/24
                 target_range = ipaddress.ip_network(target, strict=False)
                 live_hosts = detect_live_hosts(target)
-                #for ip in target_range.hosts():
+
                 if live_hosts:
                     for ip in live_hosts:
                         ip = str(ip)
