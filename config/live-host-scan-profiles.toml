@@ -6,8 +6,50 @@
 		command = 'nmap {nmap_extra} -vv -n -sn -PE -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_icmp_echo" {address}'
 		pattern = '^Nmap scan report for (?P<address>[\d\.]+)$'
 
-#    [default.nmap-top-100-tcp]
-#
-#        [default.nmap-top-100-tcp.live-host-detection]
-#        command = 'nmap {nmap_extra} -sS -sV -n -Pn -vv --top-ports 100 --reason --open -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_top_100_tcp" {address}'
-#        pattern = '^(?P<port>\d+)\/(?P<protocol>(tcp|udp))(.*)open(\s*)(?P<service>[\w\-\/]+)(\s*)(.*)$'
+	[default.nmap-tcp-ack]
+
+		[default.nmap-tcp-ack.live-host-detection]
+		command = 'nmap {nmap_extra} -vv -n -sn -PA21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_tcp_ack" {address}'
+		pattern = '^Nmap scan report for (?P<address>[\d\.]+)$'
+
+	[default.nmap-tcp-syn]
+
+		[default.nmap-tcp-syn.live-host-detection]
+		command='nmap {nmap_extra} -vv -n -sn -PS21,22,23,25,53,80,88,110,111,135,139,143,199,443,445,465,587,993,995,1025,1433,1720,1723,3306,3389,5900,8080,8443 -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_tcp_syn" {address}'
+		pattern = '^Nmap scan report for (?P<address>[\d\.]+)$'
+
+	[default.nmap-sctp]
+
+		[default.nmap-sctp.live-host-detection]
+		command='nmap {nmap_extra} -vv -n -sn -PY132,2905 -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_sctp" {address}'
+		pattern = '^Nmap scan report for (?P<address>[\d\.]+)$'
+
+	[default.nmap-udp]
+
+		[default.nmap-udp.live-host-detection]
+		command='nmap {nmap_extra} -vv -n -sn -PU53,67,68,69,123,135,137,138,139,161,162,445,500,514,520,631,1434,1600,4500,49152 -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_udp" {address}'
+		pattern = '^Nmap scan report for (?P<address>[\d\.]+)$'
+
+	[default.nmap-protocol-ping]
+
+		[default.nmap-protocol-ping.live-host-detection]
+		command='nmap {nmap_extra} -vv -n -sn -PO -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_protocol_ping" {address}'
+		pattern = '^Nmap scan report for (?P<address>[\d\.]+)$'
+
+	[default.nmap-timestamp]
+
+		[default.nmap-timestamp.live-host-detection]
+		command='nmap {nmap_extra} -vv -n -sn -PP -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_timestamp" {address}'
+		pattern = '^Nmap scan report for (?P<address>[\d\.]+)$'
+
+	[default.nmap-netmask]
+
+		[default.nmap-netmask.live-host-detection]
+		command='nmap {nmap_extra} -vv -n -sn -PM -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_netmask" {address}'
+		pattern = '^Nmap scan report for (?P<address>[\d\.]+)$'
+
+	[default.nmap-top-100-tcp]
+
+		[default.nmap-top-100-tcp.live-host-detection]
+		command='nmap {nmap_extra} -vv -sS -sV -n -Pn --top-ports 100 --reason --open -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_top_100_tcp" {address}'
+		pattern = '^Nmap scan report for (?P<address>[\d\.]+)$'

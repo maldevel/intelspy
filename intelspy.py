@@ -684,6 +684,7 @@ async def ping_and_scan(loop, semaphore, target):
 
             if result['returncode'] == 0:
                 if result['name'] == 'run_livehostscan':
+
                     for livehost in result['livehosts']:
                         if livehost not in live_hosts:
                             live_hosts.append(livehost)
