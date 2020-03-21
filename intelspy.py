@@ -110,10 +110,13 @@ DatabaseDir = ''
 LogsDir = ''
 ReportDir = ''
 TargetsDir = ''
+
 LogsFile = ''
 DatabaseFile = ''
 FinalReportMDFile = ''
 FinalReportHTMLFile = ''
+CommandsFile = ''
+
 CurrentDateTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 DbConnection = None
 
@@ -121,7 +124,6 @@ concurrent_scans = 1
 concurrent_targets = 1
 
 analyze_only = False
-
 
 
 #####################################################################################################################
@@ -352,12 +354,15 @@ async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
 async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
     async with semaphore:
         address = target.address
+        reportdir = target.reportdir
         scandir = target.scansdir
 
         info('Running task {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{cmd}{rst}' if verbose >= 1 else ''))
 
         async with target.lock:
-            with open(os.path.join(scandir, '_commands.log'), 'a') as file:
+            with open(os.path.join(reportdir, '_commands.log'), 'a') as file:
+                file.writelines(e('{cmd}\n\n'))
+            with open(CommandsFile, 'a') as file:
                 file.writelines(e('{cmd}\n\n'))
 
         start_time = time.time()
@@ -378,7 +383,7 @@ async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
     if process.returncode != 0:
         error('Task {bred}{tag}{rst} on {byellow}{address}{rst} returned non-zero exit code: {process.returncode}')
         async with target.lock:
-            with open(os.path.join(scandir, '_errors.log'), 'a') as file:
+            with open(os.path.join(reportdir, '_errors.log'), 'a') as file:
                 file.writelines(e('[*] Task {tag} returned non-zero exit code: {process.returncode}. Command: {cmd}\n'))
     else:
         info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
@@ -493,6 +498,7 @@ async def run_livehostscan(semaphore, tag, target, live_host_detection):
     async with semaphore:
 
         address = target.address
+        reportdir = target.reportdir
         scandir = target.scansdir
         nmap_speed = target.speed
         nmap_extra = nmap
@@ -503,7 +509,9 @@ async def run_livehostscan(semaphore, tag, target, live_host_detection):
         info('Running live hosts detection {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{command}{rst}' if verbose >= 1 else ''))
 
         async with target.lock:
-            with open(os.path.join(scandir, '_commands.log'), 'a') as file:
+            with open(os.path.join(reportdir, '_commands.log'), 'a') as file:
+                file.writelines(e('{command}\n\n'))
+            with open(CommandsFile, 'a') as file:
                 file.writelines(e('{command}\n\n'))
 
         start_time = time.time()
@@ -527,7 +535,7 @@ async def run_livehostscan(semaphore, tag, target, live_host_detection):
         if process.returncode != 0:
             error('Live hosts detection {bred}{tag}{rst} on {byellow}{address}{rst} returned non-zero exit code: {process.returncode}')
             async with target.lock:
-                with open(os.path.join(scandir, '_errors.log'), 'a') as file:
+                with open(os.path.join(reportdir, '_errors.log'), 'a') as file:
                     file.writelines(e('[*] Live host detection {tag} returned non-zero exit code: {process.returncode}. Command: {command}\n'))
         else:
             info('Live hosts detection {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
@@ -544,6 +552,7 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
     async with semaphore:
 
         address = target.address
+        reportdir = target.reportdir
         scandir = target.scansdir
         nmap_extra = nmap
 
@@ -555,7 +564,7 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
             info('Running port scan {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{command}{rst}' if verbose >= 1 else ''))
 
             async with target.lock:
-                with open(os.path.join(scandir, '_commands.log'), 'a') as file:
+                with open(os.path.join(reportdir, '_commands.log'), 'a') as file:
                     file.writelines(e('{command}\n\n'))
 
             start_time = time.time()
@@ -578,7 +587,7 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
             if process.returncode != 0:
                 error('Port scan {bred}{tag}{rst} on {byellow}{address}{rst} returned non-zero exit code: {process.returncode}')
                 async with target.lock:
-                    with open(os.path.join(scandir, '_errors.log'), 'a') as file:
+                    with open(os.path.join(reportdir, '_errors.log'), 'a') as file:
                         file.writelines(e('[*] Port scan {tag} returned non-zero exit code: {process.returncode}. Command: {command}\n'))
                 return {'returncode': process.returncode}
             else:
@@ -596,7 +605,7 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
         info('Running service detection {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{command}{rst}' if verbose >= 1 else ''))
 
         async with target.lock:
-            with open(os.path.join(scandir, '_commands.log'), 'a') as file:
+            with open(os.path.join(reportdir, '_commands.log'), 'a') as file:
                 file.writelines(e('{command}\n\n'))
 
         start_time = time.time()
@@ -619,7 +628,7 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
         if process.returncode != 0:
             error('Service detection {bred}{tag}{rst} on {byellow}{address}{rst} returned non-zero exit code: {process.returncode}')
             async with target.lock:
-                with open(os.path.join(scandir, '_errors.log'), 'a') as file:
+                with open(os.path.join(reportdir, '_errors.log'), 'a') as file:
                     file.writelines(e('[*] Service detection {tag} returned non-zero exit code: {process.returncode}. Command: {command}\n'))
         else:
             info('Service detection {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
@@ -656,6 +665,7 @@ async def start_heartbeat(target, period=60):
 #####################################################################################################################
 async def ping_and_scan(loop, semaphore, target):
     address = target.address
+    reportdir = target.reportdir
     scandir = target.scansdir
     pending = []
 
@@ -693,7 +703,7 @@ async def ping_and_scan(loop, semaphore, target):
 
                         info('Found live host {bmagenta}{livehost}{rst} on target {byellow}{address}{rst}')
 
-                        with open(os.path.join(target.reportdir, 'notes.txt'), 'a') as file:
+                        with open(os.path.join(reportdir, 'notes.txt'), 'a') as file:
                             file.writelines(e('[*] Live host {livehost} found on target {address}.\n\n'))
     return live_hosts
 
@@ -702,6 +712,7 @@ async def ping_and_scan(loop, semaphore, target):
 #####################################################################################################################
 async def scan_services(loop, semaphore, target):
     address = target.address
+    reportdir = target.reportdir
     scandir = target.scansdir
     pending = []
 
@@ -747,7 +758,7 @@ async def scan_services(loop, semaphore, target):
 
                         info('Found {bmagenta}{service}{rst} on {bmagenta}{protocol}/{port}{rst} on target {byellow}{address}{rst}')
 
-                        with open(os.path.join(target.reportdir, 'notes.txt'), 'a') as file:
+                        with open(os.path.join(reportdir, 'notes.txt'), 'a') as file:
                             file.writelines(e('[*] {service} found on {protocol}/{port}.\n\n\n\n'))
 
                         if protocol == 'udp':
@@ -791,7 +802,7 @@ async def scan_services(loop, semaphore, target):
 
                             if 'manual' in service_scans_config[service_scan]:
                                 heading = False
-                                with open(os.path.join(scandir, '_manual_commands.txt'), 'a') as file:
+                                with open(os.path.join(reportdir, '_manual_commands.log'), 'a') as file:
                                     for manual in service_scans_config[service_scan]['manual']:
                                         if 'description' in manual:
                                             if not heading:
@@ -902,9 +913,12 @@ def scan_host(target, concurrent_scans):
 
     scandir = os.path.join(TargetsDir, target.replace('/', '_'), 'scans')
     target.scansdir = scandir
+    reportdir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'report')
+    target.reportdir = reportdir
 
     if not analyze_only:
         Path(scandir).mkdir(parents=True, exist_ok=True)
+        Path(reportdir).mkdir(parents=True, exist_ok=True)
 
     # Use a lock when writing to specific files that may be written to by other asynchronous functions.
     target.lock = asyncio.Lock()
@@ -951,18 +965,20 @@ def isRoot():
 #####################################################################################################################
 def createProjectDirStructure(projName, workingDir, analyze):
         global ProjectDir, CommandsDir, DatabaseDir, LogsDir, ReportDir, TargetsDir, LogsFile
-        global DatabaseFile, FinalReportMDFile, FinalReportHTMLFile
+        global DatabaseFile, FinalReportMDFile, FinalReportHTMLFile, CommandsFile
 
         ProjectDir = os.path.join(workingDir, projName)
-        CommandsDir = os.path.join(ProjectDir, 'commands')
-        DatabaseDir = os.path.join(ProjectDir, 'db')
-        LogsDir = os.path.join(ProjectDir, 'logs')
-        ReportDir = os.path.join(ProjectDir, 'report')
-        TargetsDir = os.path.join(ProjectDir, 'targets')
-        LogsFile = os.path.join(LogsDir, "{0}-logs-{1}.txt".format(projName, CurrentDateTime) )
-        DatabaseFile = os.path.join(DatabaseDir, "{0}-database-{1}.db".format(projName, CurrentDateTime))
-        FinalReportMDFile = os.path.join(ReportDir, "{0}-final-report-{1}.md".format(projName, CurrentDateTime))
+        CommandsDir = os.path.join(ProjectDir, 'commands', CurrentDateTime)
+        DatabaseDir = os.path.join(ProjectDir, 'db', CurrentDateTime)
+        LogsDir = os.path.join(ProjectDir, 'logs', CurrentDateTime)
+        ReportDir = os.path.join(ProjectDir, 'report', CurrentDateTime)
+        TargetsDir = os.path.join(ProjectDir, 'targets', CurrentDateTime)
+
+        LogsFile = os.path.join(LogsDir, "_logs.txt")
+        DatabaseFile = os.path.join(DatabaseDir, "_database.db")
+        FinalReportMDFile = os.path.join(ReportDir, "final-report.md")
         FinalReportHTMLFile = FinalReportMDFile.replace('.md', '.html')
+        CommandsFile = os.path.join(CommandsDir, "_commands.log")
 
         if not analyze:
             Path(CommandsDir).mkdir(parents=True, exist_ok=True)
@@ -981,7 +997,7 @@ def dbconnect(analyze):
     try:
         DbConnection = sqlite3.connect(DatabaseFile)
         if not analyze:
-            dbcreateLiveHostsTbl()
+            dbcreateTargetsTbl()
             dbcreateTopTcpPortsTbl()
             dbcreateTopUdpPortsTbl()
 
@@ -1003,13 +1019,13 @@ def dbdisconnect():
         error("An error occured during sqlite3 database connection: {0}.".format(str(e)))
         exit(1)
 
-def dbaddLiveHost(liveHost):
+def dbaddTarget(liveHost):
     global DbConnection
 
     try:
         if DbConnection:
             c = DbConnection.cursor()
-            c.execute('''REPLACE INTO live_hosts(Ipaddr) 
+            c.execute('''REPLACE INTO targets(Ipaddr) 
                 VALUES(?);''', [liveHost])
             DbConnection.commit()
             id = c.lastrowid
@@ -1051,13 +1067,13 @@ def dbaddTopUdpPort(host, ports):
         error("An error occured during database data insertion: {0}.".format(str(e)))
         exit(1)
 
-def dbgetLiveHosts():
+def dbgetTargets():
     global DbConnection
 
     try:
         if DbConnection:
             c = DbConnection.cursor()
-            c.execute('''SELECT Ipaddr from live_hosts;''')
+            c.execute('''SELECT Ipaddr from targets;''')
             DbConnection.commit()
             rows = c.fetchall()
             c.close()
@@ -1066,12 +1082,12 @@ def dbgetLiveHosts():
         error("An error occured during database data selection: {0}.".format(str(e)))
         exit(1)
 
-def dbcreateLiveHostsTbl():
+def dbcreateTargetsTbl():
     global DbConnection
 
     try:
         if DbConnection:
-            DbConnection.execute('''CREATE TABLE live_hosts
+            DbConnection.execute('''CREATE TABLE targets
              (ID INTEGER PRIMARY KEY AUTOINCREMENT,
              Ipaddr VARCHAR(50) UNIQUE NOT NULL);''')
     except Exception as e:
@@ -1250,7 +1266,6 @@ if __name__ == '__main__':
 
     parser.add_argument('--analyze', metavar='<datetime>', help='analyze results, no scan (e.g. 2020-03-14_18-07-32)', required=False, default=False)
     parser.add_argument('--exclude', metavar='<host1[,host2][,host3],...>', help='exclude hosts/networks', required=False)
-
     parser.add_argument('-s','--speed', help='0-5, set timing template (higher is faster) (default: 4)', required=False, default=4)
 
     parser.add_argument('-ct', '--concurrent-targets', action='store', metavar='<number>', type=int, default=5, help='The maximum number of target hosts to scan concurrently. Default: %(default)s')
@@ -1298,6 +1313,9 @@ if __name__ == '__main__':
 
     if analyze_only:
         CurrentDateTime = analyze_only
+
+    if args.exclude:
+        nmap = "--exclude {}".format(args.exclude)
 
     createProjectDirStructure(args.project_name, args.working_dir, analyze_only)
 
@@ -1380,6 +1398,14 @@ if __name__ == '__main__':
 
     if errors:
         sys.exit(1)
+
+    with open(FinalReportMDFile, 'w') as file:
+        file.write("# Final Report\n\n")
+        file.write("## Target/s\n\n")
+        for target in targets:
+            dbaddTarget(target)
+            file.write("* {0}\n".format(target))
+        file.write("---\n\n")
 
     #scans
     # with ProcessPoolExecutor(max_workers=args.concurrent_targets) as executor:
