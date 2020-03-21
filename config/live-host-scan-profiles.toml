@@ -53,3 +53,35 @@
 		[default.nmap-top-100-tcp.live-host-detection]
 		command='nmap {nmap_extra} -vv -sS -sV -n -Pn --top-ports 100 --reason --open -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_top_100_tcp" {address}'
 		pattern = '^Nmap scan report for (?P<address>[\d\.]+)$'
+
+[quick]
+
+	[quick.nmap-icmp-echo]
+
+		[quick.nmap-icmp-echo.live-host-detection]
+		command = 'nmap {nmap_extra} -vv -n -sn -PE -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_icmp_echo" {address}'
+		pattern = '^Nmap scan report for (?P<address>[\d\.]+)$'
+
+	[quick.nmap-sctp]
+
+		[quick.nmap-sctp.live-host-detection]
+		command='nmap {nmap_extra} -vv -n -sn -PY132,2905 -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_sctp" {address}'
+		pattern = '^Nmap scan report for (?P<address>[\d\.]+)$'
+
+	[quick.nmap-protocol-ping]
+
+		[quick.nmap-protocol-ping.live-host-detection]
+		command='nmap {nmap_extra} -vv -n -sn -PO -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_protocol_ping" {address}'
+		pattern = '^Nmap scan report for (?P<address>[\d\.]+)$'
+
+	[quick.nmap-timestamp]
+
+		[quick.nmap-timestamp.live-host-detection]
+		command='nmap {nmap_extra} -vv -n -sn -PP -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_timestamp" {address}'
+		pattern = '^Nmap scan report for (?P<address>[\d\.]+)$'
+
+	[quick.nmap-netmask]
+
+		[quick.nmap-netmask.live-host-detection]
+		command='nmap {nmap_extra} -vv -n -sn -PM -T{nmap_speed} -oA "{scandir}/_nmap_live_hosts_netmask" {address}'
+		pattern = '^Nmap scan report for (?P<address>[\d\.]+)$'

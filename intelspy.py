@@ -23,7 +23,8 @@
 #    For more see the file 'LICENSE' for copying permission.
 
 
-# Created by @maldevel | Logisek
+# Created by @maldevel | @LOGISEK_LTD
+# https://logisek.com
 # https://pentest-labs.com
 # intelspy.py Version 1.0
 # Released under GPL Version 3 License
@@ -65,8 +66,9 @@ message = """
                                 
 IntelSpy v{0} - Perform automated network reconnaissance scans to gather network intelligence.
 IntelSpy is an open source tool licensed under GPLv3.
-Written by: @maldevel | Logisek
-https://pentest-labs.com/
+Written by: @maldevel | @LOGISEK_LTD
+https://logisek.com
+https://pentest-labs.com
 https://github.com/maldevel/intelspy
 
 """.format(__version__)
@@ -467,7 +469,7 @@ async def parse_service_detection(stream, tag, target, pattern):
 
             parse_match = re.search(pattern, line)
             if parse_match:
-                services.append((parse_match.group('protocol').lower(), int(parse_match.group('port')), parse_match.group('service')))
+                services.append((parse_match.group('protocol').lower(), int(parse_match.group('port')), parse_match.group('service'), parse_match.group('version')))
 
             for p in global_patterns:
                 matches = re.findall(p['pattern'], line)
@@ -554,6 +556,7 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
         address = target.address
         reportdir = target.reportdir
         scandir = target.scansdir
+        nmap_speed = target.speed
         nmap_extra = nmap
 
         ports = ''
@@ -565,6 +568,8 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
 
             async with target.lock:
                 with open(os.path.join(reportdir, '_commands.log'), 'a') as file:
+                    file.writelines(e('{command}\n\n'))
+                with open(CommandsFile, 'a') as file:
                     file.writelines(e('{command}\n\n'))
 
             start_time = time.time()
@@ -606,6 +611,8 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
 
         async with target.lock:
             with open(os.path.join(reportdir, '_commands.log'), 'a') as file:
+                file.writelines(e('{command}\n\n'))
+            with open(CommandsFile, 'a') as file:
                 file.writelines(e('{command}\n\n'))
 
         start_time = time.time()
@@ -672,7 +679,7 @@ async def ping_and_scan(loop, semaphore, target):
     heartbeat = loop.create_task(start_heartbeat(target, period=heartbeat_interval))
 
     for profile in live_host_scan_profiles_config:
-        if profile == port_scan_profile:    #default: default
+        if profile == live_host_scan_profile:    #default: default
 
             for scan in live_host_scan_profiles_config[profile]:
 
@@ -714,6 +721,8 @@ async def scan_services(loop, semaphore, target):
     address = target.address
     reportdir = target.reportdir
     scandir = target.scansdir
+    nmap_speed = target.speed
+    nmap_extra = nmap
     pending = []
 
     heartbeat = loop.create_task(start_heartbeat(target, period=heartbeat_interval))
@@ -755,120 +764,121 @@ async def scan_services(loop, semaphore, target):
                         protocol = service_tuple[0]
                         port = service_tuple[1]
                         service = service_tuple[2]
+                        version = service_tuple[3]
 
-                        info('Found {bmagenta}{service}{rst} on {bmagenta}{protocol}/{port}{rst} on target {byellow}{address}{rst}')
+                        info('Found {bmagenta}{service}{rst} ({bmagenta}{version}{rst}) on {bmagenta}{protocol}/{port}{rst} on target {byellow}{address}{rst}')
 
                         with open(os.path.join(reportdir, 'notes.txt'), 'a') as file:
-                            file.writelines(e('[*] {service} found on {protocol}/{port}.\n\n\n\n'))
+                            file.writelines(e('[*] {service} found on {protocol}/{port}.\n\n'))
 
-                        if protocol == 'udp':
-                            nmap_extra = nmap + " -sU"
-                        else:
-                            nmap_extra = nmap
+                        # if protocol == 'udp':
+                        #     nmap_extra = nmap + " -sU"
+                        # else:
+                        #     nmap_extra = nmap
 
-                        secure = True if 'ssl' in service or 'tls' in service else False
+                        # secure = True if 'ssl' in service or 'tls' in service else False
 
-                        # Special cases for HTTP.
-                        scheme = 'https' if 'https' in service or 'ssl' in service or 'tls' in service else 'http'
+                        # # Special cases for HTTP.
+                        # scheme = 'https' if 'https' in service or 'ssl' in service or 'tls' in service else 'http'
 
-                        if service.startswith('ssl/') or service.startswith('tls/'):
-                            service = service[4:]
+                        # if service.startswith('ssl/') or service.startswith('tls/'):
+                        #     service = service[4:]
 
-                        for service_scan in service_scans_config:
-                            # Skip over configurable variables since the python toml parser cannot iterate over tables only.
-                            if service_scan in ['username_wordlist', 'password_wordlist']:
-                                continue
+                        # for service_scan in service_scans_config:
+                        #     # Skip over configurable variables since the python toml parser cannot iterate over tables only.
+                        #     if service_scan in ['username_wordlist', 'password_wordlist']:
+                        #         continue
 
-                            ignore_service = False
-                            if 'ignore-service-names' in service_scans_config[service_scan]:
-                                for ignore_service_name in service_scans_config[service_scan]['ignore-service-names']:
-                                    if re.search(ignore_service_name, service):
-                                        ignore_service = True
-                                        break
+                        #     ignore_service = False
+                        #     if 'ignore-service-names' in service_scans_config[service_scan]:
+                        #         for ignore_service_name in service_scans_config[service_scan]['ignore-service-names']:
+                        #             if re.search(ignore_service_name, service):
+                        #                 ignore_service = True
+                        #                 break
 
-                            if ignore_service:
-                                continue
+                        #     if ignore_service:
+                        #         continue
 
-                            matched_service = False
+                        #     matched_service = False
 
-                            if 'service-names' in service_scans_config[service_scan]:
-                                for service_name in service_scans_config[service_scan]['service-names']:
-                                    if re.search(service_name, service):
-                                        matched_service = True
-                                        break
+                        #     if 'service-names' in service_scans_config[service_scan]:
+                        #         for service_name in service_scans_config[service_scan]['service-names']:
+                        #             if re.search(service_name, service):
+                        #                 matched_service = True
+                        #                 break
 
-                            if not matched_service:
-                                continue
+                        #     if not matched_service:
+                        #         continue
 
-                            if 'manual' in service_scans_config[service_scan]:
-                                heading = False
-                                with open(os.path.join(reportdir, '_manual_commands.log'), 'a') as file:
-                                    for manual in service_scans_config[service_scan]['manual']:
-                                        if 'description' in manual:
-                                            if not heading:
-                                                file.writelines(e('[*] {service} on {protocol}/{port}\n\n'))
-                                                heading = True
-                                            description = manual['description']
-                                            file.writelines(e('\t[-] {description}\n\n'))
-                                        if 'commands' in manual:
-                                            if not heading:
-                                                file.writelines(e('[*] {service} on {protocol}/{port}\n\n'))
-                                                heading = True
-                                            for manual_command in manual['commands']:
-                                                manual_command = e(manual_command)
-                                                file.writelines('\t\t' + e('{manual_command}\n\n'))
-                                    if heading:
-                                        file.writelines('\n')
+                        #     if 'manual' in service_scans_config[service_scan]:
+                        #         heading = False
+                        #         with open(os.path.join(reportdir, '_manual_commands.log'), 'a') as file:
+                        #             for manual in service_scans_config[service_scan]['manual']:
+                        #                 if 'description' in manual:
+                        #                     if not heading:
+                        #                         file.writelines(e('[*] {service} on {protocol}/{port}\n\n'))
+                        #                         heading = True
+                        #                     description = manual['description']
+                        #                     file.writelines(e('\t[-] {description}\n\n'))
+                        #                 if 'commands' in manual:
+                        #                     if not heading:
+                        #                         file.writelines(e('[*] {service} on {protocol}/{port}\n\n'))
+                        #                         heading = True
+                        #                     for manual_command in manual['commands']:
+                        #                         manual_command = e(manual_command)
+                        #                         file.writelines('\t\t' + e('{manual_command}\n\n'))
+                        #             if heading:
+                        #                 file.writelines('\n')
 
-                            if 'scan' in service_scans_config[service_scan]:
-                                for scan in service_scans_config[service_scan]['scan']:
+                        #     if 'scan' in service_scans_config[service_scan]:
+                        #         for scan in service_scans_config[service_scan]['scan']:
 
-                                    if 'name' in scan:
-                                        name = scan['name']
-                                        if 'command' in scan:
-                                            tag = e('{protocol}/{port}/{name}')
-                                            command = scan['command']
+                        #             if 'name' in scan:
+                        #                 name = scan['name']
+                        #                 if 'command' in scan:
+                        #                     tag = e('{protocol}/{port}/{name}')
+                        #                     command = scan['command']
 
-                                            if 'ports' in scan:
-                                                port_match = False
+                        #                     if 'ports' in scan:
+                        #                         port_match = False
 
-                                                if protocol == 'tcp':
-                                                    if 'tcp' in scan['ports']:
-                                                        for tcp_port in scan['ports']['tcp']:
-                                                            if port == tcp_port:
-                                                                port_match = True
-                                                                break
-                                                elif protocol == 'udp':
-                                                    if 'udp' in scan['ports']:
-                                                        for udp_port in scan['ports']['udp']:
-                                                            if port == udp_port:
-                                                                port_match = True
-                                                                break
+                        #                         if protocol == 'tcp':
+                        #                             if 'tcp' in scan['ports']:
+                        #                                 for tcp_port in scan['ports']['tcp']:
+                        #                                     if port == tcp_port:
+                        #                                         port_match = True
+                        #                                         break
+                        #                         elif protocol == 'udp':
+                        #                             if 'udp' in scan['ports']:
+                        #                                 for udp_port in scan['ports']['udp']:
+                        #                                     if port == udp_port:
+                        #                                         port_match = True
+                        #                                         break
 
-                                                if port_match == False:
-                                                    warn(Fore.YELLOW + '[' + Style.BRIGHT + tag + Style.NORMAL + '] Scan cannot be run against {protocol} port {port}. Skipping.' + Fore.RESET)
-                                                    continue
+                        #                         if port_match == False:
+                        #                             warn(Fore.YELLOW + '[' + Style.BRIGHT + tag + Style.NORMAL + '] Scan cannot be run against {protocol} port {port}. Skipping.' + Fore.RESET)
+                        #                             continue
 
-                                            if 'run_once' in scan and scan['run_once'] == True:
-                                                scan_tuple = (name,)
-                                                if scan_tuple in target.scans:
-                                                    warn(Fore.YELLOW + '[' + Style.BRIGHT + tag + ' on ' + address + Style.NORMAL + '] Scan should only be run once and it appears to have already been queued. Skipping.' + Fore.RESET)
-                                                    continue
-                                                else:
-                                                    target.scans.append(scan_tuple)
-                                            else:
-                                                scan_tuple = (protocol, port, service, name)
-                                                if scan_tuple in target.scans:
-                                                    warn(Fore.YELLOW + '[' + Style.BRIGHT + tag + ' on ' + address + Style.NORMAL + '] Scan appears to have already been queued, but it is not marked as run_once in service-scans.toml. Possible duplicate tag? Skipping.' + Fore.RESET)
-                                                    continue
-                                                else:
-                                                    target.scans.append(scan_tuple)
+                        #                     if 'run_once' in scan and scan['run_once'] == True:
+                        #                         scan_tuple = (name,)
+                        #                         if scan_tuple in target.scans:
+                        #                             warn(Fore.YELLOW + '[' + Style.BRIGHT + tag + ' on ' + address + Style.NORMAL + '] Scan should only be run once and it appears to have already been queued. Skipping.' + Fore.RESET)
+                        #                             continue
+                        #                         else:
+                        #                             target.scans.append(scan_tuple)
+                        #                     else:
+                        #                         scan_tuple = (protocol, port, service, name)
+                        #                         if scan_tuple in target.scans:
+                        #                             warn(Fore.YELLOW + '[' + Style.BRIGHT + tag + ' on ' + address + Style.NORMAL + '] Scan appears to have already been queued, but it is not marked as run_once in service-scans.toml. Possible duplicate tag? Skipping.' + Fore.RESET)
+                        #                             continue
+                        #                         else:
+                        #                             target.scans.append(scan_tuple)
 
-                                            patterns = []
-                                            if 'pattern' in scan:
-                                                patterns = scan['pattern']
+                        #                     patterns = []
+                        #                     if 'pattern' in scan:
+                        #                         patterns = scan['pattern']
 
-                                            pending.add(asyncio.ensure_future(run_cmd(semaphore, e(command), target, tag=tag, patterns=patterns)))
+                        #                     pending.add(asyncio.ensure_future(run_cmd(semaphore, e(command), target, tag=tag, patterns=patterns)))
 
 
 
@@ -911,7 +921,7 @@ def scan_host(target, concurrent_scans):
     start_time = time.time()
     info('Scanning target {byellow}{target.address}{rst}')
 
-    scandir = os.path.join(TargetsDir, target.replace('/', '_'), 'scans')
+    scandir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'scans', 'ports')
     target.scansdir = scandir
     reportdir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'report')
     target.reportdir = reportdir
@@ -998,8 +1008,7 @@ def dbconnect(analyze):
         DbConnection = sqlite3.connect(DatabaseFile)
         if not analyze:
             dbcreateTargetsTbl()
-            dbcreateTopTcpPortsTbl()
-            dbcreateTopUdpPortsTbl()
+            dbcreatePortsTbl()
 
         info('Database connection established. Database file \'{byellow}{DatabaseFile}{rst}\'.')
     except Exception as e:
@@ -1035,30 +1044,14 @@ def dbaddTarget(liveHost):
         error("An error occured during database data insertion: {0}.".format(str(e)))
         exit(1)
 
-def dbaddTopTcpPort(host, ports):
+def dbaddPort(host, protocol, port, service):
     global DbConnection
 
     try:
         if DbConnection:
             c = DbConnection.cursor()
-            c.execute('''REPLACE INTO top_tcp_ports(Ipaddr,Ports) 
-                VALUES(?,?);''', (host,ports))
-            DbConnection.commit()
-            id = c.lastrowid
-            c.close()
-            return id
-    except Exception as e:
-        error("An error occured during database data insertion: {0}.".format(str(e)))
-        exit(1)
-
-def dbaddTopUdpPort(host, ports):
-    global DbConnection
-
-    try:
-        if DbConnection:
-            c = DbConnection.cursor()
-            c.execute('''REPLACE INTO top_udp_ports(Ipaddr,Ports) 
-                VALUES(?,?);''', (host,ports))
+            c.execute('''REPLACE INTO ports(Ipaddr,Protocol,Port,Service) 
+                VALUES(?,?,?,?);''', (host, protocol, port, service))
             DbConnection.commit()
             id = c.lastrowid
             c.close()
@@ -1094,28 +1087,17 @@ def dbcreateTargetsTbl():
         error("An error occured during database table creation: {0}.".format(str(e)))
         exit(1)
 
-def dbcreateTopTcpPortsTbl():
+def dbcreatePortsTbl():
     global DbConnection
 
     try:
         if DbConnection:
-            DbConnection.execute('''CREATE TABLE top_tcp_ports
+            DbConnection.execute('''CREATE TABLE ports
              (ID INTEGER PRIMARY KEY AUTOINCREMENT,
-             Ipaddr VARCHAR(50) UNIQUE NOT NULL, 
-             Ports TEXT NOT NULL);''')
-    except Exception as e:
-        error("An error occured during database table creation: {0}.".format(str(e)))
-        exit(1)
-
-def dbcreateTopUdpPortsTbl():
-    global DbConnection
-
-    try:
-        if DbConnection:
-            DbConnection.execute('''CREATE TABLE top_udp_ports
-             (ID INTEGER PRIMARY KEY AUTOINCREMENT,
-             Ipaddr VARCHAR(50) UNIQUE NOT NULL, 
-             Ports TEXT NOT NULL);''')
+             Ipaddr VARCHAR(50) NOT NULL, 
+             Protocol VARCHAR(50) NOT NULL,
+             Port TEXT NOT NULL,
+             Service TEXT NOT NULL);''')
     except Exception as e:
         error("An error occured during database table creation: {0}.".format(str(e)))
         exit(1)
@@ -1407,26 +1389,26 @@ if __name__ == '__main__':
             file.write("* {0}\n".format(target))
         file.write("---\n\n")
 
-    #scans
-    # with ProcessPoolExecutor(max_workers=args.concurrent_targets) as executor:
-    #     start_time = time.time()
-    #     futures = []
 
-    #     for address in targets:
-    #         target = Target(address)
-    #         futures.append(executor.submit(scan_host, target, concurrent_scans))
+    with ProcessPoolExecutor(max_workers=args.concurrent_targets) as executor:
+        start_time = time.time()
+        futures = []
 
-    #     try:
-    #         for future in as_completed(futures):
-    #             future.result()
-    #     except KeyboardInterrupt:
-    #         for future in futures:
-    #             future.cancel()
-    #         executor.shutdown(wait=False)
-    #         sys.exit(1)
+        for address in targets:
+            target = Target(address)
+            futures.append(executor.submit(scan_host, target, concurrent_scans))
 
-    #     elapsed_time = calculate_elapsed_time(start_time)
-    #     info('{bgreen}Finished scanning all targets in {elapsed_time}!{rst}')
+        try:
+            for future in as_completed(futures):
+                future.result()
+        except KeyboardInterrupt:
+            for future in futures:
+                future.cancel()
+            executor.shutdown(wait=False)
+            sys.exit(1)
+
+        elapsed_time = calculate_elapsed_time(start_time)
+        info('{bgreen}Finished scanning all targets in {elapsed_time}!{rst}')
 
     dbdisconnect()
     elapsed_time = calculate_elapsed_time(start_time)
