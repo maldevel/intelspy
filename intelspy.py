@@ -1158,11 +1158,11 @@ def findProfile(profileName, configList):
             for scan in configList[profile]:
 
                 if 'service-detection' not in configList[profile][scan]:
-                    error('The {profile}.{scan} scan does not have a defined service-detection section. Every scan must at least have a service-detection section defined with a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the result.')
+                    error('The {profile}.{scan} scan does not have a defined service-detection section. Every scan must at least have a service-detection section defined with a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, service and version from the result.')
                     errors = True
                 else:
                     if 'command' not in configList[profile][scan]['service-detection']:
-                        error('The {profile}.{scan}.service-detection section does not have a command defined. Every service-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the results.')
+                        error('The {profile}.{scan}.service-detection section does not have a command defined. Every service-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, service and version from the results.')
                         errors = True
                     else:
                         if '{ports}' in configList[profile][scan]['service-detection']['command'] and 'port-scan' not in configList[profile][scan]:
@@ -1170,7 +1170,7 @@ def findProfile(profileName, configList):
                             errors = True
 
                     if 'pattern' not in configList[profile][scan]['service-detection']:
-                        error('The {profile}.{scan}.service-detection section does not have a pattern defined. Every service-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the results.')
+                        error('The {profile}.{scan}.service-detection section does not have a pattern defined. Every service-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, service and version from the results.')
                         errors = True
                     else:
                         if not all(x in configList[profile][scan]['service-detection']['pattern'] for x in ['(?P<port>', '(?P<protocol>', '(?P<service>']):
@@ -1223,11 +1223,11 @@ def findLiveHostProfile(profileName, configList):
             for scan in configList[profile]:
 
                 if 'live-host-detection' not in configList[profile][scan]:
-                    error('The {profile}.{scan} scan does not have a defined live-host-detection section. Every scan must at least have a live-host-detection section defined with a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the result.')
+                    error('The {profile}.{scan} scan does not have a defined live-host-detection section. Every scan must at least have a live-host-detection section defined with a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, service and version from the result.')
                     errors = True
                 else:
                     if 'command' not in configList[profile][scan]['live-host-detection']:
-                        error('The {profile}.{scan}.live-host-detection section does not have a command defined. Every live-host-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the results.')
+                        error('The {profile}.{scan}.live-host-detection section does not have a command defined. Every live-host-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, service and version from the results.')
                         errors = True
                     else:
                         if '{ports}' in configList[profile][scan]['live-host-detection']['command'] and 'port-scan' not in configList[profile][scan]:
@@ -1235,7 +1235,7 @@ def findLiveHostProfile(profileName, configList):
                             errors = True
 
                     if 'pattern' not in configList[profile][scan]['live-host-detection']:
-                        error('The {profile}.{scan}.live-host-detection section does not have a pattern defined. Every live-host-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, and service from the results.')
+                        error('The {profile}.{scan}.live-host-detection section does not have a pattern defined. Every live-host-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, service and version from the results.')
                         errors = True
                     else:
                         if not all(x in configList[profile][scan]['live-host-detection']['pattern'] for x in ['(?P<address>']):
