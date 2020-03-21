@@ -50,6 +50,8 @@ import termios
 from pathlib import Path
 from datetime import timezone
 import sqlite3
+import subprocess
+from subprocess import Popen, PIPE, STDOUT
 
 
 #####################################################################################################################
@@ -67,8 +69,7 @@ message = """
 IntelSpy v{0} - Perform automated network reconnaissance scans to gather network intelligence.
 IntelSpy is an open source tool licensed under GPLv3.
 Written by: @maldevel | @LOGISEK_LTD
-https://logisek.com
-https://pentest-labs.com
+https://logisek.com | https://pentest-labs.com
 https://github.com/maldevel/intelspy
 
 """.format(__version__)
@@ -126,6 +127,7 @@ concurrent_scans = 1
 concurrent_targets = 1
 
 analyze_only = False
+
 
 
 #####################################################################################################################
@@ -741,7 +743,9 @@ async def scan_services(loop, semaphore, target):
                     pending.append(run_portscan(semaphore, scan, target, service_detection))
             break
 
-    services = []
+    #services = []
+    target_services = {}
+    target_services[target.address] = []
 
     while True:
         if not pending:
@@ -756,8 +760,11 @@ async def scan_services(loop, semaphore, target):
             if result['returncode'] == 0:
                 if result['name'] == 'run_portscan':
                     for service_tuple in result['services']:
-                        if service_tuple not in services:
-                            services.append(service_tuple)
+                        if service_tuple not in target_services[target.address]:
+                        #if service_tuple not in services:
+                            #services.append(service_tuple)
+                            #services[target.address] = service_tuple
+                            target_services[target.address].append(service_tuple)
                         else:
                             continue
 
@@ -879,7 +886,8 @@ async def scan_services(loop, semaphore, target):
                         #                         patterns = scan['pattern']
 
                         #                     pending.add(asyncio.ensure_future(run_cmd(semaphore, e(command), target, tag=tag, patterns=patterns)))
-
+    #return services
+    return target_services
 
 
 
@@ -940,9 +948,13 @@ def scan_host(target, concurrent_scans):
     semaphore = asyncio.Semaphore(concurrent_scans)
 
     try:
-        loop.run_until_complete(scan_services(loop, semaphore, target))
+        # loop.run_until_complete(scan_services(loop, semaphore, target))
+        # elapsed_time = calculate_elapsed_time(start_time)
+        # info('Finished scanning target {byellow}{target.address}{rst} in {elapsed_time}')
+        services = loop.run_until_complete(asyncio.gather(scan_services(loop, semaphore, target)))
         elapsed_time = calculate_elapsed_time(start_time)
         info('Finished scanning target {byellow}{target.address}{rst} in {elapsed_time}')
+        return services
     except KeyboardInterrupt:
         sys.exit(1)
 
@@ -1008,7 +1020,7 @@ def dbconnect(analyze):
         DbConnection = sqlite3.connect(DatabaseFile)
         if not analyze:
             dbcreateTargetsTbl()
-            dbcreatePortsTbl()
+            dbcreateServicesTbl()
 
         info('Database connection established. Database file \'{byellow}{DatabaseFile}{rst}\'.')
     except Exception as e:
@@ -1034,7 +1046,7 @@ def dbaddTarget(liveHost):
     try:
         if DbConnection:
             c = DbConnection.cursor()
-            c.execute('''REPLACE INTO targets(Ipaddr) 
+            c.execute('''REPLACE INTO targets(Target) 
                 VALUES(?);''', [liveHost])
             DbConnection.commit()
             id = c.lastrowid
@@ -1044,14 +1056,14 @@ def dbaddTarget(liveHost):
         error("An error occured during database data insertion: {0}.".format(str(e)))
         exit(1)
 
-def dbaddPort(host, protocol, port, service):
+def dbaddService(host, protocol, port, service, version):
     global DbConnection
 
     try:
         if DbConnection:
             c = DbConnection.cursor()
-            c.execute('''REPLACE INTO ports(Ipaddr,Protocol,Port,Service) 
-                VALUES(?,?,?,?);''', (host, protocol, port, service))
+            c.execute('''REPLACE INTO services(Target,Protocol,Port,Service,Version) 
+                VALUES(?,?,?,?,?);''', (host, protocol, port, service, version))
             DbConnection.commit()
             id = c.lastrowid
             c.close()
@@ -1066,7 +1078,7 @@ def dbgetTargets():
     try:
         if DbConnection:
             c = DbConnection.cursor()
-            c.execute('''SELECT Ipaddr from targets;''')
+            c.execute('''SELECT Target from targets;''')
             DbConnection.commit()
             rows = c.fetchall()
             c.close()
@@ -1082,25 +1094,27 @@ def dbcreateTargetsTbl():
         if DbConnection:
             DbConnection.execute('''CREATE TABLE targets
              (ID INTEGER PRIMARY KEY AUTOINCREMENT,
-             Ipaddr VARCHAR(50) UNIQUE NOT NULL);''')
+             Target VARCHAR(50) UNIQUE NOT NULL);''')
     except Exception as e:
         error("An error occured during database table creation: {0}.".format(str(e)))
         exit(1)
 
-def dbcreatePortsTbl():
+def dbcreateServicesTbl():
     global DbConnection
 
     try:
         if DbConnection:
-            DbConnection.execute('''CREATE TABLE ports
+            DbConnection.execute('''CREATE TABLE services
              (ID INTEGER PRIMARY KEY AUTOINCREMENT,
-             Ipaddr VARCHAR(50) NOT NULL, 
+             Target VARCHAR(50) NOT NULL, 
              Protocol VARCHAR(50) NOT NULL,
-             Port TEXT NOT NULL,
-             Service TEXT NOT NULL);''')
+             Port VARCHAR(50) NOT NULL,
+             Service TEXT NOT NULL,
+             Version TEXT NOT NULL);''')
     except Exception as e:
         error("An error occured during database table creation: {0}.".format(str(e)))
         exit(1)
+
 
 
 
@@ -1127,6 +1141,7 @@ def detect_live_hosts(targetRange):
         info('{bgreen}Live Hosts scanning completed in {elapsed_time}!{rst}')
 
         return live_hosts
+
 
 
 
@@ -1194,6 +1209,7 @@ def findProfile(profileName, configList):
 
 
 
+
 #####################################################################################################################
 def findLiveHostProfile(profileName, configList):
     #check if requested profile scan exists and is valid
@@ -1231,14 +1247,30 @@ def findLiveHostProfile(profileName, configList):
 
 
 
+
+#####################################################################################################################
+def html(mdfile,htmlfile):
+
+        command = "pandoc -f markdown {0} > {1}".format(mdfile, htmlfile)
+        info('Generating HTML report' + (' with {bblue}{command}{rst}' if verbose >= 1 else ''))
+
+        with open(CommandsFile, 'a') as file:
+            file.writelines(f"{command}\n\n")
+
+        try:
+            subprocess.run(command, shell=True)
+
+        except Exception as e:
+            error("An error occured during HTML report generation: {0}.".format(e))
+
+
+
 #####################################################################################################################
 if __name__ == '__main__':
 
-    #print intelspy message
     print(message)
     start_time = time.time()
 
-    #intespy arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('targets', action='store', help='IP addresses (e.g. 10.0.0.1), CIDR notation (e.g. 10.0.0.1/24), or resolvable hostnames (e.g. example.com) to scan.', nargs="*")
     parser.add_argument('-ts', '--targets', action='store', type=str, default='', dest='target_file', help='Read targets from file.', required=False)
@@ -1387,8 +1419,9 @@ if __name__ == '__main__':
         for target in targets:
             dbaddTarget(target)
             file.write("* {0}\n".format(target))
-        file.write("---\n\n")
 
+        file.write("\n---\n\n")
+        file.write("## Services\n\n")
 
     with ProcessPoolExecutor(max_workers=args.concurrent_targets) as executor:
         start_time = time.time()
@@ -1399,8 +1432,43 @@ if __name__ == '__main__':
             futures.append(executor.submit(scan_host, target, concurrent_scans))
 
         try:
-            for future in as_completed(futures):
-                future.result()
+            with open(FinalReportMDFile, 'a') as file:
+                tcpports = []
+                udpports = []
+                for future in as_completed(futures):
+                    if future.result():
+                        if future.result()[0]:
+
+                            for host, vals in future.result()[0].items():
+                                file.write("### Target {0}\n\n".format(host))
+
+                                for val in vals:
+                                    file.write("* **{0}/{1}** *{2}*\n".format(val[0], val[1], val[2]))
+                                    file.write("    * {0}\n".format(val[3]))
+                                    dbaddService(host, val[0], val[1], val[2], val[3])
+
+                                    if val[0] == 'tcp':
+                                        if val[1] not in tcpports:
+                                            tcpports.append(val[1])
+                                    else:
+                                        if val[1] not in udpports:
+                                            udpports.append(val[1])
+
+                                file.write("\n---\n\n")
+
+                #file.write("\n---\n\n")
+                uniqueTcpPorts = sorted(set(tcpports))
+                uniqueUdpPorts = sorted(set(udpports))
+
+                tcpPortscommalist = ','.join(str(s) for s in uniqueTcpPorts)
+                udpPortscommalist = ','.join(str(s) for s in uniqueUdpPorts)
+
+                file.write("## Hosts & Ports\n")
+                file.write("\n* **{0}**\n".format(','.join(targets)))
+                file.write("\n* TCP: **{0}**\n".format(tcpPortscommalist))
+                file.write("\n* UDP: **{0}**\n".format(udpPortscommalist))
+                file.write("\n---\n\n")
+
         except KeyboardInterrupt:
             for future in futures:
                 future.cancel()
@@ -1409,6 +1477,8 @@ if __name__ == '__main__':
 
         elapsed_time = calculate_elapsed_time(start_time)
         info('{bgreen}Finished scanning all targets in {elapsed_time}!{rst}')
+
+    html(FinalReportMDFile, FinalReportHTMLFile)
 
     dbdisconnect()
     elapsed_time = calculate_elapsed_time(start_time)
