@@ -52,6 +52,8 @@ from datetime import timezone
 import sqlite3
 import subprocess
 from subprocess import Popen, PIPE, STDOUT
+from random import randrange
+
 
 
 #####################################################################################################################
@@ -203,7 +205,7 @@ def cprint(*args, type='info', color=Fore.RESET, char='*', sep=' ', end='\n', fr
 
 #####################################################################################################################
 def debug(*args, color=Fore.BLUE, sep=' ', end='\n', file=sys.stdout, **kvargs):
-    if verbose >= 2:
+    if verbose >= 3:
         cprint(*args, type='debug', color=color, char='-', sep=sep, end=end, file=file, frame_index=2, **kvargs)
 
 def info(*args, sep=' ', end='\n', file=sys.stdout, **kvargs):
@@ -359,7 +361,7 @@ async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
         reportdir = target.reportdir
         scandir = target.scansdir
 
-        info('Running task {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{cmd}{rst}' if verbose >= 1 else ''))
+        info('Running task {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{cmd}{rst}' if verbose >= 2 else ''))
 
         async with target.lock:
             with open(os.path.join(reportdir, '_commands.log'), 'a') as file:
@@ -513,7 +515,7 @@ async def run_livehostscan(semaphore, tag, target, live_host_detection):
         command = e(live_host_detection[0])
         pattern = live_host_detection[1]
 
-        info('Running live hosts detection {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{command}{rst}' if verbose >= 1 else ''))
+        info('Running live hosts detection {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{command}{rst}' if verbose >= 2 else ''))
 
         async with target.lock:
             with open(os.path.join(reportdir, '_commands.log'), 'a') as file:
@@ -569,7 +571,7 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
             command = e(port_scan[0])
             pattern = port_scan[1]
 
-            info('Running port scan {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{command}{rst}' if verbose >= 1 else ''))
+            info('Running port scan {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{command}{rst}' if verbose >= 2 else ''))
 
             async with target.lock:
                 with open(os.path.join(reportdir, '_commands.log'), 'a') as file:
@@ -609,10 +611,13 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
 
             ports = ','.join(ports)
 
+        #add random closed high port for better OS fingerprinting results
+        ports += ',' + str(randrange(64000, 65534))
+
         command = e(service_detection[0])
         pattern = service_detection[1]
 
-        info('Running service detection {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{command}{rst}' if verbose >= 1 else ''))
+        info('Running service detection {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{command}{rst}' if verbose >= 2 else ''))
 
         async with target.lock:
             with open(os.path.join(reportdir, '_commands.log'), 'a') as file:
@@ -1251,7 +1256,7 @@ def findLiveHostProfile(profileName, configList):
 def html(mdfile,htmlfile):
 
         command = "pandoc -f markdown {0} > {1}".format(mdfile, htmlfile)
-        info('Generating HTML report' + (' with {bblue}{command}{rst}' if verbose >= 1 else ''))
+        info('Generating HTML report' + (' with {bblue}{command}{rst}' if verbose >= 2 else ''))
 
         with open(CommandsFile, 'a') as file:
             file.writelines(f"{command}\n\n")
@@ -1282,6 +1287,7 @@ if __name__ == '__main__':
 
     parser.add_argument('-ct', '--concurrent-targets', action='store', metavar='<number>', type=int, default=5, help='The maximum number of target hosts to scan concurrently. Default: %(default)s')
     parser.add_argument('-cs', '--concurrent-scans', action='store', metavar='<number>', type=int, default=10, help='The maximum number of scans to perform per target host. Default: %(default)s')
+    
     parser.add_argument('--profile', action='store', default='default', dest='profile_name', help='The port scanning profile to use (defined in port-scan-profiles.toml). Default: %(default)s')
     parser.add_argument('--livehost-profile', action='store', default='default', dest='livehost_profile_name', help='The live host scanning profile to use (defined in live-host-scan-profiles.toml). Default: %(default)s')
 

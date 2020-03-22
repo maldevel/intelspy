@@ -6,3 +6,15 @@ pattern = 'State: (?:(?:LIKELY\_?)?VULNERABLE)'
 
 [[pattern]]
 pattern = '(?i)unauthorized'
+
+[[pattern]]
+description = 'Host Hardware Address. ({match})'
+pattern = 'MAC Address: .*'
+
+[[pattern]]
+description = 'Operating System. ({match})'
+pattern = 'OS details: .*'
+
+[[pattern]]
+description = 'Operating System guess. ({match})'
+pattern = 'Aggressive OS guesses: .*'
