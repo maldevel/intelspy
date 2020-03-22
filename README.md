@@ -19,7 +19,7 @@ I had started working on IntelSpy when one day I discovered [AutoRecon](https://
 ### Features
 
 * Scans multiple targets in the form of IP addresses, IP ranges (CIDR notation) and resolvable hostnames.
-* Scan targets concurrently.
+* Scans targets concurrently.
 * Detects live hosts in an IP range (CIDR) network.
 * Customizable port scanning profiles and service enumeration commands.
 * Creates a directory structure for results gathering.
