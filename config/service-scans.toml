@@ -10,7 +10,7 @@ service-names = [
 
     [[all-services.scan]]
     name = 'sslscan'
-    command = 'if [ "{secure}" == "True" ]; then sslscan --show-certificate --no-colour {address}:{port} 2>&1 | tee "{scandir}/{protocol}_{port}_sslscan.txt"; fi'
+    command = 'if [ "{secure}" == "True" ]; then sslscan --show-certificate --no-colour {address}:{port} 2>&1 | tee "{scandir}/_{protocol}_{port}_sslscan.txt"; fi'
 
 [cassandra]
 
@@ -20,7 +20,7 @@ service-names = [
 
     [[cassandra.scan]]
     name = 'nmap-cassandra'
-    command = 'nmap {nmap_extra} -sV  -p {port} --script="banner,(cassandra* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oN "{scandir}/{protocol}_{port}_cassandra_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_cassandra_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV  -p {port} --script="banner,(cassandra* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oA "{scandir}/_{protocol}_{port}_cassandra_nmap" {address}'
 
 [cups]
 
@@ -30,7 +30,7 @@ service-names = [
 
     [[cups.scan]]
     name = 'nmap-cups'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(cups* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oN "{scandir}/{protocol}_{port}_cups_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_cups_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(cups* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oA "{scandir}/_{protocol}_{port}_cups_nmap" {address}'
 
 [distcc]
 
@@ -40,7 +40,7 @@ service-names = [
 
     [[distcc.scan]]
     name = 'nmap-distcc'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,distcc-cve2004-2687" --script-args="distcc-cve2004-2687.cmd=id" -oN "{scandir}/{protocol}_{port}_distcc_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_distcc_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,distcc-cve2004-2687" --script-args="distcc-cve2004-2687.cmd=id" -oA "{scandir}/_{protocol}_{port}_distcc_nmap" {address}'
 
 [dns]
 
@@ -50,7 +50,7 @@ service-names = [
 
     [[dns.scan]]
     name = 'nmap-dns'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(dns* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oN "{scandir}/{protocol}_{port}_dns_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_dns_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(dns* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oA "{scandir}/_{protocol}_{port}_dns_nmap" {address}'
 
 [finger]
 
@@ -60,7 +60,7 @@ service-names = [
 
     [[finger.scan]]
     nmap = 'nmap-finger'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,finger" -oN "{scandir}/{protocol}_{port}_finger_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_finger_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,finger" -oA "{scandir}/_{protocol}_{port}_finger_nmap" {address}'
 
 [ftp]
 
@@ -71,7 +71,7 @@ service-names = [
 
     [[ftp.scan]]
     name = 'nmap-ftp'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(ftp* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oN "{scandir}/{protocol}_{port}_ftp_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_ftp_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(ftp* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oA "{scandir}/_{protocol}_{port}_ftp_nmap" {address}'
 
         [[ftp.scan.pattern]]
         description = 'Anonymous FTP Enabled!'
@@ -80,8 +80,8 @@ service-names = [
     [[ftp.manual]]
     description = 'Bruteforce logins:'
     commands = [
-        'hydra -L "{username_wordlist}" -P "{password_wordlist}" -e nsr -s {port} -o "{scandir}/{protocol}_{port}_ftp_hydra.txt" ftp://{address}',
-        'medusa -U "{username_wordlist}" -P "{password_wordlist}" -e ns -n {port} -O "{scandir}/{protocol}_{port}_ftp_medusa.txt" -M ftp -h {address}'
+        'hydra -L "{username_wordlist}" -P "{password_wordlist}" -e nsr -s {port} -o "{scandir}/_{protocol}_{port}_ftp_hydra.txt" ftp://{address}',
+        'medusa -U "{username_wordlist}" -P "{password_wordlist}" -e ns -n {port} -O "{scandir}/_{protocol}_{port}_ftp_medusa.txt" -M ftp -h {address}'
     ]
 
 [http]
@@ -96,7 +96,7 @@ ignore-service-names = [
 
     [[http.scan]]
     name = 'nmap-http'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(http* or ssl*) and not (brute or broadcast or dos or external or http-slowloris* or fuzzer)" -oN "{scandir}/{protocol}_{port}_http_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_{scheme}_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(http* or ssl*) and not (brute or broadcast or dos or external or http-slowloris* or fuzzer)" -oA "{scandir}/_{protocol}_{port}_http_nmap" {address}'
 
         [[http.scan.pattern]]
         description = 'Identified HTTP Server: {match}'
@@ -108,14 +108,14 @@ ignore-service-names = [
 
     [[http.scan]]
     name = 'curl-index'
-    command = 'curl -sSik {scheme}://{address}:{port}/ -m 10 2>&1 | tee "{scandir}/{protocol}_{port}_{scheme}_index.html"'
+    command = 'curl -sSik {scheme}://{address}:{port}/ -m 10 2>&1 | tee "{scandir}/_{protocol}_{port}_{scheme}_index.html"'
 
         [[http.scan.pattern]]
         pattern = '(?i)Powered by [^\n]+'
 
     [[http.scan]]
     name = 'curl-robots'
-    command = 'curl -sSik {scheme}://{address}:{port}/robots.txt -m 10 2>&1 | tee "{scandir}/{protocol}_{port}_{scheme}_robots.txt"'
+    command = 'curl -sSik {scheme}://{address}:{port}/robots.txt -m 10 2>&1 | tee "{scandir}/_{protocol}_{port}_{scheme}_robots.txt"'
 
     [[http.scan]]
     name = 'wkhtmltoimage'
@@ -123,57 +123,57 @@ ignore-service-names = [
 
     [[http.scan]]
     name = 'whatweb'
-    command = 'whatweb --color=never --no-errors -a 3 -v {scheme}://{address}:{port} 2>&1 | tee "{scandir}/{protocol}_{port}_{scheme}_whatweb.txt"'
+    command = 'whatweb --color=never --no-errors -a 3 -v {scheme}://{address}:{port} 2>&1 | tee "{scandir}/_{protocol}_{port}_{scheme}_whatweb.txt"'
 
     [[http.scan]]
     name = 'nikto'
-    command = 'nikto -ask=no -h {scheme}://{address}:{port} 2>&1 | tee "{scandir}/{protocol}_{port}_{scheme}_nikto.txt"'
+    command = 'nikto -ask=no -h {scheme}://{address}:{port} 2>&1 | tee "{scandir}/_{protocol}_{port}_{scheme}_nikto.txt"'
 
     [[http.scan]]
     name = 'gobuster'
-    command = 'if [[ `gobuster -h 2>&1 | grep -F "mode (dir)"` ]]; then gobuster -u {scheme}://{address}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/common.txt -e -k -l -s "200,204,301,302,307,401,403" -x "txt,html,php,asp,aspx,jsp" -o "{scandir}/{protocol}_{port}_{scheme}_gobuster.txt"; else gobuster dir -u {scheme}://{address}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/common.txt -z -k -l -x "txt,html,php,asp,aspx,jsp" -o "{scandir}/{protocol}_{port}_{scheme}_gobuster.txt"; fi'
+    command = 'if [[ `gobuster -h 2>&1 | grep -F "mode (dir)"` ]]; then gobuster -u {scheme}://{address}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/common.txt -e -k -l -s "200,204,301,302,307,401,403" -x "txt,html,php,asp,aspx,jsp" -o "{scandir}/_{protocol}_{port}_{scheme}_gobuster.txt"; else gobuster dir -u {scheme}://{address}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/common.txt -z -k -l -x "txt,html,php,asp,aspx,jsp" -o "{scandir}/_{protocol}_{port}_{scheme}_gobuster.txt"; fi'
 
     [[http.manual]]
     description = '(dirsearch) Multi-threaded recursive directory/file enumeration for web servers using various wordlists:'
     commands = [
-        'dirsearch -u {scheme}://{address}:{port}/ -t 16 -r -e txt,html,php,asp,aspx,jsp -f -w /usr/share/seclists/Discovery/Web-Content/big.txt --plain-text-report="{scandir}/{protocol}_{port}_{scheme}_dirsearch_big.txt"',
-        'dirsearch -u {scheme}://{address}:{port}/ -t 16 -r -e txt,html,php,asp,aspx,jsp -f -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt --plain-text-report="{scandir}/{protocol}_{port}_{scheme}_dirsearch_dirbuster.txt"'
+        'dirsearch -u {scheme}://{address}:{port}/ -t 16 -r -e txt,html,php,asp,aspx,jsp -f -w /usr/share/seclists/Discovery/Web-Content/big.txt --plain-text-report="{scandir}/_{protocol}_{port}_{scheme}_dirsearch_big.txt"',
+        'dirsearch -u {scheme}://{address}:{port}/ -t 16 -r -e txt,html,php,asp,aspx,jsp -f -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt --plain-text-report="{scandir}/_{protocol}_{port}_{scheme}_dirsearch_dirbuster.txt"'
     ]
 
     [[http.manual]]
     description = '(dirb) Recursive directory/file enumeration for web servers using various wordlists (same as dirsearch above):'
     commands = [
-        'dirb {scheme}://{address}:{port}/ /usr/share/seclists/Discovery/Web-Content/big.txt -l -r -S -X ",.txt,.html,.php,.asp,.aspx,.jsp" -o "{scandir}/{protocol}_{port}_{scheme}_dirb_big.txt"',
-        'dirb {scheme}://{address}:{port}/ /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -l -r -S -X ",.txt,.html,.php,.asp,.aspx,.jsp" -o "{scandir}/{protocol}_{port}_{scheme}_dirb_dirbuster.txt"'
+        'dirb {scheme}://{address}:{port}/ /usr/share/seclists/Discovery/Web-Content/big.txt -l -r -S -X ",.txt,.html,.php,.asp,.aspx,.jsp" -o "{scandir}/_{protocol}_{port}_{scheme}_dirb_big.txt"',
+        'dirb {scheme}://{address}:{port}/ /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -l -r -S -X ",.txt,.html,.php,.asp,.aspx,.jsp" -o "{scandir}/_{protocol}_{port}_{scheme}_dirb_dirbuster.txt"'
     ]
 
     [[http.manual]]
     description = '(gobuster v3) Directory/file enumeration for web servers using various wordlists (same as dirb above):'
     commands = [
-        'gobuster dir -u {scheme}://{address}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/big.txt -e -k -l -s "200,204,301,302,307,403,500" -x "txt,html,php,asp,aspx,jsp" -z -o "{scandir}/{protocol}_{port}_{scheme}_gobuster_big.txt"',
-        'gobuster dir -u {scheme}://{address}:{port}/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e -k -l -s "200,204,301,302,307,403,500" -x "txt,html,php,asp,aspx,jsp" -z -o "{scandir}/{protocol}_{port}_{scheme}_gobuster_dirbuster.txt"'
+        'gobuster dir -u {scheme}://{address}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/big.txt -e -k -l -s "200,204,301,302,307,403,500" -x "txt,html,php,asp,aspx,jsp" -z -o "{scandir}/_{protocol}_{port}_{scheme}_gobuster_big.txt"',
+        'gobuster dir -u {scheme}://{address}:{port}/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e -k -l -s "200,204,301,302,307,403,500" -x "txt,html,php,asp,aspx,jsp" -z -o "{scandir}/_{protocol}_{port}_{scheme}_gobuster_dirbuster.txt"'
     ]
 
     [[http.manual]]
     description = '(gobuster v1 & v2) Directory/file enumeration for web servers using various wordlists (same as dirb above):'
     commands = [
-        'gobuster -u {scheme}://{address}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/big.txt -e -k -l -s "200,204,301,302,307,403,500" -x "txt,html,php,asp,aspx,jsp" -o "{scandir}/{protocol}_{port}_{scheme}_gobuster_big.txt"',
-        'gobuster -u {scheme}://{address}:{port}/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e -k -l -s "200,204,301,302,307,403,500" -x "txt,html,php,asp,aspx,jsp" -o "{scandir}/{protocol}_{port}_{scheme}_gobuster_dirbuster.txt"'
+        'gobuster -u {scheme}://{address}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/big.txt -e -k -l -s "200,204,301,302,307,403,500" -x "txt,html,php,asp,aspx,jsp" -o "{scandir}/_{protocol}_{port}_{scheme}_gobuster_big.txt"',
+        'gobuster -u {scheme}://{address}:{port}/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e -k -l -s "200,204,301,302,307,403,500" -x "txt,html,php,asp,aspx,jsp" -o "{scandir}/_{protocol}_{port}_{scheme}_gobuster_dirbuster.txt"'
     ]
 
     [[http.manual]]
     description = '(wpscan) WordPress Security Scanner (useful if WordPress is found):'
     commands = [
-        'wpscan --url {scheme}://{address}:{port}/ --no-update -e vp,vt,tt,cb,dbe,u,m --plugins-detection aggressive --plugins-version-detection aggressive -f cli-no-color 2>&1 | tee "{scandir}/{protocol}_{port}_{scheme}_wpscan.txt"'
+        'wpscan --url {scheme}://{address}:{port}/ --no-update -e vp,vt,tt,cb,dbe,u,m --plugins-detection aggressive --plugins-version-detection aggressive -f cli-no-color 2>&1 | tee "{scandir}/_{protocol}_{port}_{scheme}_wpscan.txt"'
     ]
 
     [[http.manual]]
     description = "Credential bruteforcing commands (don't run these without modifying them):"
     commands = [
-        'hydra -L "{username_wordlist}" -P "{password_wordlist}" -e nsr -s {port} -o "{scandir}/{protocol}_{port}_{scheme}_auth_hydra.txt" {scheme}-get://{address}/path/to/auth/area',
-        'medusa -U "{username_wordlist}" -P "{password_wordlist}" -e ns -n {port} -O "{scandir}/{protocol}_{port}_{scheme}_auth_medusa.txt" -M http -h {address} -m DIR:/path/to/auth/area',
-        'hydra -L "{username_wordlist}" -P "{password_wordlist}" -e nsr -s {port} -o "{scandir}/{protocol}_{port}_{scheme}_form_hydra.txt" {scheme}-post-form://{address}/path/to/login.php:username=^USER^&password=^PASS^:invalid-login-message',
-        'medusa -U "{username_wordlist}" -P "{password_wordlist}" -e ns -n {port} -O "{scandir}/{protocol}_{port}_{scheme}_form_medusa.txt" -M web-form -h {address} -m FORM:/path/to/login.php -m FORM-DATA:"post?username=&password=" -m DENY-SIGNAL:"invalid login message"',
+        'hydra -L "{username_wordlist}" -P "{password_wordlist}" -e nsr -s {port} -o "{scandir}/_{protocol}_{port}_{scheme}_auth_hydra.txt" {scheme}-get://{address}/path/to/auth/area',
+        'medusa -U "{username_wordlist}" -P "{password_wordlist}" -e ns -n {port} -O "{scandir}/_{protocol}_{port}_{scheme}_auth_medusa.txt" -M http -h {address} -m DIR:/path/to/auth/area',
+        'hydra -L "{username_wordlist}" -P "{password_wordlist}" -e nsr -s {port} -o "{scandir}/_{protocol}_{port}_{scheme}_form_hydra.txt" {scheme}-post-form://{address}/path/to/login.php:username=^USER^&password=^PASS^:invalid-login-message',
+        'medusa -U "{username_wordlist}" -P "{password_wordlist}" -e ns -n {port} -O "{scandir}/_{protocol}_{port}_{scheme}_form_medusa.txt" -M web-form -h {address} -m FORM:/path/to/login.php -m FORM-DATA:"post?username=&password=" -m DENY-SIGNAL:"invalid login message"',
     ]
 
 [imap]
@@ -184,7 +184,7 @@ service-names = [
 
     [[imap.scan]]
     name = 'nmap-imap'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(imap* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oN "{scandir}/{protocol}_{port}_imap_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_imap_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(imap* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oA "{scandir}/_{protocol}_{port}_imap_nmap" {address}'
 
 [kerberos]
 
@@ -195,7 +195,7 @@ service-names = [
 
     [[kerberos.scan]]
     name = 'nmap-kerberos'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,krb5-enum-users" -oN "{scandir}/{protocol}_{port}_kerberos_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_kerberos_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,krb5-enum-users" -oA "{scandir}/_{protocol}_{port}_kerberos_nmap" {address}'
 
 [ldap]
 
@@ -205,11 +205,11 @@ service-names = [
 
     [[ldap.scan]]
     name = 'nmap-ldap'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(ldap* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oN "{scandir}/{protocol}_{port}_ldap_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_ldap_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(ldap* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oA "{scandir}/_{protocol}_{port}_ldap_nmap" {address}'
 
     [[ldap.scan]]
     name = 'enum4linux'
-    command = 'enum4linux -a -M -l -d {address} 2>&1 | tee "{scandir}/enum4linux.txt"'
+    command = 'enum4linux -a -M -l -d {address} 2>&1 | tee "{scandir}/_enum4linux.txt"'
     run_once = true
     ports.tcp = [139, 389, 445]
     ports.udp = [137]
@@ -217,7 +217,7 @@ service-names = [
     [[ldap.manual]]
     description = 'ldapsearch command (modify before running)'
     commands = [
-        'ldapsearch -x -D "<username>" -w "<password>"" -p {port} -h {address} -b "dc=example,dc=com" -s sub "(objectclass=*) 2>&1 | tee > "{scandir}/{protocol}_{port}_ldap_all-entries.txt"'
+        'ldapsearch -x -D "<username>" -w "<password>"" -p {port} -h {address} -b "dc=example,dc=com" -s sub "(objectclass=*) 2>&1 | tee > "{scandir}/_{protocol}_{port}_ldap_all-entries.txt"'
     ]
 
 [mongodb]
@@ -228,7 +228,7 @@ service-names = [
 
     [[mongodb.scan]]
     name = 'nmap-mongodb'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(mongodb* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oN "{scandir}/{protocol}_{port}_mongodb_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_mongodb_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(mongodb* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oA "{scandir}/_{protocol}_{port}_mongodb_nmap" {address}'
 
 [mssql]
 
@@ -239,7 +239,7 @@ service-names = [
 
     [[mssql.scan]]
     name = 'nmap-mssql'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(ms-sql* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" --script-args="mssql.instance-port={port},mssql.username=sa,mssql.password=sa" -oN "{scandir}/{protocol}_{port}_mssql_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_mssql_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(ms-sql* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" --script-args="mssql.instance-port={port},mssql.username=sa,mssql.password=sa" -oA "{scandir}/_{protocol}_{port}_mssql_nmap" {address}'
 
     [[mssql.manual]]
     description = '(sqsh) interactive database shell'
@@ -255,7 +255,7 @@ service-names = [
 
     [[mysql.scan]]
     name = 'nmap-mysql'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(mysql* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oN "{scandir}/{protocol}_{port}_mysql_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_mysql_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(mysql* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oA "{scandir}/_{protocol}_{port}_mysql_nmap" {address}'
 
 [nfs]
 
@@ -266,11 +266,11 @@ service-names = [
 
     [[nfs.scan]]
     name = 'nmap-nfs'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(rpcinfo or nfs*) and not (brute or broadcast or dos or external or fuzzer)" -oN "{scandir}/{protocol}_{port}_nfs_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_nfs_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(rpcinfo or nfs*) and not (brute or broadcast or dos or external or fuzzer)" -oA "{scandir}/_{protocol}_{port}_nfs_nmap" {address}'
 
     [[nfs.scan]]
     name = 'showmount'
-    command = 'showmount -e {address} 2>&1 | tee "{scandir}/{protocol}_{port}_showmount.txt"'
+    command = 'showmount -e {address} 2>&1 | tee "{scandir}/_{protocol}_{port}_showmount.txt"'
 
 [nntp]
 
@@ -280,7 +280,7 @@ service-names = [
 
     [[nntp.scan]]
     name = 'nmap-nntp'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,nntp-ntlm-info" -oN "{scandir}/{protocol}_{port}_nntp_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_nntp_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,nntp-ntlm-info" -oA "{scandir}/_{protocol}_{port}_nntp_nmap" {address}'
 
 [oracle]
 
@@ -290,27 +290,27 @@ service-names = [
 
     [[oracle.scan]]
     name = 'nmap-oracle'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(oracle* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oN "{scandir}/{protocol}_{port}_oracle_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_oracle_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(oracle* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oA "{scandir}/_{protocol}_{port}_oracle_nmap" {address}'
 
     [[oracle.scan]]
     name = 'oracle-tnscmd-ping'
-    command = 'tnscmd10g ping -h {address} -p {port} 2>&1 | tee "{scandir}/{protocol}_{port}_oracle_tnscmd_ping.txt"'
+    command = 'tnscmd10g ping -h {address} -p {port} 2>&1 | tee "{scandir}/_{protocol}_{port}_oracle_tnscmd_ping.txt"'
 
     [[oracle.scan]]
     name = 'oracle-tnscmd-version'
-    command = 'tnscmd10g version -h {address} -p {port} 2>&1 | tee "{scandir}/{protocol}_{port}_oracle_tnscmd_version.txt"'
+    command = 'tnscmd10g version -h {address} -p {port} 2>&1 | tee "{scandir}/_{protocol}_{port}_oracle_tnscmd_version.txt"'
 
     [[oracle.scan]]
     name = 'oracle-tnscmd-version'
-    command = 'tnscmd10g version -h {address} -p {port} 2>&1 | tee "{scandir}/{protocol}_{port}_oracle_tnscmd_version.txt"'
+    command = 'tnscmd10g version -h {address} -p {port} 2>&1 | tee "{scandir}/_{protocol}_{port}_oracle_tnscmd_version.txt"'
 
     [[oracle.scan]]
     name = 'oracle-scanner'
-    command = 'oscanner -v -s {address} -P {port} 2>&1 | tee "{scandir}/{protocol}_{port}_oracle_scanner.txt"'
+    command = 'oscanner -v -s {address} -P {port} 2>&1 | tee "{scandir}/_{protocol}_{port}_oracle_scanner.txt"'
 
     [[oracle.manual]]
     description = 'Brute-force SIDs using Nmap'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,oracle-sid-brute" -oN "{scandir}/{protocol}_{port}_oracle_sid-brute_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_oracle_sid-brute_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,oracle-sid-brute" -oA "{scandir}/_{protocol}_{port}_oracle_sid-brute_nmap" {address}'
 
     [[oracle.manual]]
     description = 'Install ODAT (https://github.com/quentinhardy/odat) and run the following commands:'
@@ -337,7 +337,7 @@ service-names = [
 
     [[pop3.scan]]
     name = 'nmap-pop3'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(pop3* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oN "{scandir}/{protocol}_{port}_pop3_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_pop3_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(pop3* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oA "{scandir}/_{protocol}_{port}_pop3_nmap" {address}'
 
 [rdp]
 
@@ -349,13 +349,13 @@ service-names = [
 
     [[rdp.scan]]
     name = 'nmap-rdp'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(rdp* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oN "{scandir}/{protocol}_{port}_rdp_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_rdp_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(rdp* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oA "{scandir}/_{protocol}_{port}_rdp_nmap" {address}'
 
     [[rdp.manual]]
     description = 'Bruteforce logins:'
     commands = [
-        'hydra -L "{username_wordlist}" -P "{password_wordlist}" -e nsr -s {port} -o "{scandir}/{protocol}_{port}_rdp_hydra.txt" rdp://{address}',
-        'medusa -U "{username_wordlist}" -P "{password_wordlist}" -e ns -n {port} -O "{scandir}/{protocol}_{port}_rdp_medusa.txt" -M rdp -h {address}'
+        'hydra -L "{username_wordlist}" -P "{password_wordlist}" -e nsr -s {port} -o "{scandir}/_{protocol}_{port}_rdp_hydra.txt" rdp://{address}',
+        'medusa -U "{username_wordlist}" -P "{password_wordlist}" -e ns -n {port} -O "{scandir}/_{protocol}_{port}_rdp_medusa.txt" -M rdp -h {address}'
     ]
 
 [rmi]
@@ -367,7 +367,7 @@ service-names = [
 
     [[rmi.scan]]
     name = 'nmap-rmi'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,rmi-vuln-classloader,rmi-dumpregistry" -oN "{scandir}/{protocol}_{port}_rmi_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_rmi_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,rmi-vuln-classloader,rmi-dumpregistry" -oA "{scandir}/_{protocol}_{port}_rmi_nmap" {address}'
 
 [rpc]
 
@@ -379,7 +379,7 @@ service-names = [
 
     [[rpc.scan]]
     name = 'nmap-msrpc'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,msrpc-enum,rpc-grind,rpcinfo" -oN "{scandir}/{protocol}_{port}_rpc_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_rpc_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,msrpc-enum,rpc-grind,rpcinfo" -oA "{scandir}/_{protocol}_{port}_rpc_nmap" {address}'
 
     [[rpc.manual]]
     description = 'RPC Client:'
@@ -395,7 +395,7 @@ service-names = [
 
     [[sip.scan]]
     name = 'nmap-sip'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,sip-enum-users,sip-methods" -oN "{scandir}/{protocol}_{port}_sip_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_sip_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,sip-enum-users,sip-methods" -oA "{scandir}/_{protocol}_{port}_sip_nmap" {address}'
 
     [[sip.scan]]
     name = 'svwar'
@@ -409,13 +409,13 @@ service-names = [
 
     [[ssh.scan]]
     name = 'nmap-ssh'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,ssh2-enum-algos,ssh-hostkey,ssh-auth-methods" -oN "{scandir}/{protocol}_{port}_ssh_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_ssh_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,ssh2-enum-algos,ssh-hostkey,ssh-auth-methods" -oA "{scandir}/_{protocol}_{port}_ssh_nmap" {address}'
 
     [[ssh.manual]]
     description = 'Bruteforce logins:'
     commands = [
-        'hydra -L "{username_wordlist}" -P "{password_wordlist}" -e nsr -s {port} -o "{scandir}/{protocol}_{port}_ssh_hydra.txt" ssh://{address}',
-        'medusa -U "{username_wordlist}" -P "{password_wordlist}" -e ns -n {port} -O "{scandir}/{protocol}_{port}_ssh_medusa.txt" -M ssh -h {address}'
+        'hydra -L "{username_wordlist}" -P "{password_wordlist}" -e nsr -s {port} -o "{scandir}/_{protocol}_{port}_ssh_hydra.txt" ssh://{address}',
+        'medusa -U "{username_wordlist}" -P "{password_wordlist}" -e ns -n {port} -O "{scandir}/_{protocol}_{port}_ssh_medusa.txt" -M ssh -h {address}'
     ]
 [smb]
 
@@ -427,45 +427,45 @@ service-names = [
 
     [[smb.scan]]
     name = 'nmap-smb'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(nbstat or smb* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" --script-args="unsafe=1" -oN "{scandir}/{protocol}_{port}_smb_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_smb_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(nbstat or smb* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" --script-args="unsafe=1" -oA "{scandir}/_{protocol}_{port}_smb_nmap" {address}'
 
     [[smb.scan]]
     name = 'enum4linux'
-    command = 'enum4linux -a -M -l -d {address} 2>&1 | tee "{scandir}/enum4linux.txt"'
+    command = 'enum4linux -a -M -l -d {address} 2>&1 | tee "{scandir}/_enum4linux.txt"'
     run_once = true
     ports.tcp = [139, 389, 445]
     ports.udp = [137]
 
     [[smb.scan]]
     name = 'nbtscan'
-    command = 'nbtscan -rvh {address} 2>&1 | tee "{scandir}/nbtscan.txt"'
+    command = 'nbtscan -rvh {address} 2>&1 | tee "{scandir}/_nbtscan.txt"'
     run_once = true
     ports.udp = [137]
 
     [[smb.scan]]
     name = 'smbclient'
-    command = 'smbclient -L\\ -N -I {address} 2>&1 | tee "{scandir}/smbclient.txt"'
+    command = 'smbclient -L\\ -N -I {address} 2>&1 | tee "{scandir}/_smbclient.txt"'
     run_once = true
     ports.tcp = [139, 445]
 
     [[smb.scan]]
     name = 'smbmap-share-permissions'
-    command = 'smbmap -H {address} -P {port} 2>&1 | tee -a "{scandir}/smbmap-share-permissions.txt"; smbmap -u null -p "" -H {address} -P {port} 2>&1 | tee -a "{scandir}/smbmap-share-permissions.txt"'
+    command = 'smbmap -H {address} -P {port} 2>&1 | tee -a "{scandir}/_smbmap-share-permissions.txt"; smbmap -u null -p "" -H {address} -P {port} 2>&1 | tee -a "{scandir}/_smbmap-share-permissions.txt"'
 
     [[smb.scan]]
     name = 'smbmap-list-contents'
-    command = 'smbmap -H {address} -P {port} -R 2>&1 | tee -a "{scandir}/smbmap-list-contents.txt"; smbmap -u null -p "" -H {address} -P {port} -R 2>&1 | tee -a "{scandir}/smbmap-list-contents.txt"'
+    command = 'smbmap -H {address} -P {port} -R 2>&1 | tee -a "{scandir}/_smbmap-list-contents.txt"; smbmap -u null -p "" -H {address} -P {port} -R 2>&1 | tee -a "{scandir}/_smbmap-list-contents.txt"'
 
     [[smb.scan]]
     name = 'smbmap-execute-command'
-    command = 'smbmap -H {address} -P {port} -x "ipconfig /all" 2>&1 | tee -a "{scandir}/smbmap-execute-command.txt"; smbmap -u null -p "" -H {address} -P {port} -x "ipconfig /all" 2>&1 | tee -a "{scandir}/smbmap-execute-command.txt"'
+    command = 'smbmap -H {address} -P {port} -x "ipconfig /all" 2>&1 | tee -a "{scandir}/_smbmap-execute-command.txt"; smbmap -u null -p "" -H {address} -P {port} -x "ipconfig /all" 2>&1 | tee -a "{scandir}/_smbmap-execute-command.txt"'
 
     [[smb.manual]]
     description = 'Nmap scans for SMB vulnerabilities that could potentially cause a DoS if scanned (according to Nmap). Be careful:'
     commands = [
-        'nmap {nmap_extra} -sV -p {port} --script="smb-vuln-ms06-025" --script-args="unsafe=1" -oN "{scandir}/{protocol}_{port}_smb_ms06-025.txt" -oX "{scandir}/xml/{protocol}_{port}_smb_ms06-025.xml" {address}',
-        'nmap {nmap_extra} -sV -p {port} --script="smb-vuln-ms07-029" --script-args="unsafe=1" -oN "{scandir}/{protocol}_{port}_smb_ms07-029.txt" -oX "{scandir}/xml/{protocol}_{port}_smb_ms07-029.xml" {address}',
-        'nmap {nmap_extra} -sV -p {port} --script="smb-vuln-ms08-067" --script-args="unsafe=1" -oN "{scandir}/{protocol}_{port}_smb_ms08-067.txt" -oX "{scandir}/xml/{protocol}_{port}_smb_ms08-067.xml" {address}'
+        'nmap {nmap_extra} -sV -p {port} --script="smb-vuln-ms06-025" --script-args="unsafe=1" -oA "{scandir}/_{protocol}_{port}_smb_ms06-025" {address}',
+        'nmap {nmap_extra} -sV -p {port} --script="smb-vuln-ms07-029" --script-args="unsafe=1" -oA "{scandir}/_{protocol}_{port}_smb_ms07-029"  {address}',
+        'nmap {nmap_extra} -sV -p {port} --script="smb-vuln-ms08-067" --script-args="unsafe=1" -oA "{scandir}/_{protocol}_{port}_smb_ms08-067" {address}'
     ]
 
 [smtp]
@@ -476,11 +476,11 @@ service-names = [
 
     [[smtp.scan]]
     name = 'nmap-smtp'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(smtp* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oN "{scandir}/{protocol}_{port}_smtp_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_smtp_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(smtp* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oA "{scandir}/_{protocol}_{port}_smtp_nmap" {address}'
 
     [[smtp.scan]]
     name = 'smtp-user-enum'
-    command = 'smtp-user-enum -M VRFY -U "{username_wordlist}" -t {address} -p {port} 2>&1 | tee "{scandir}/{protocol}_{port}_smtp_user-enum.txt"'
+    command = 'smtp-user-enum -M VRFY -U "{username_wordlist}" -t {address} -p {port} 2>&1 | tee "{scandir}/_{protocol}_{port}_smtp_user-enum.txt"'
 
 [snmp]
 
@@ -490,59 +490,59 @@ service-names = [
 
     [[snmp.scan]]
     name = 'nmap-snmp'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(snmp* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oN "{scandir}/{protocol}_{port}_snmp-nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_snmp_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(snmp* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" -oA "{scandir}/_{protocol}_{port}_snmp-nmap" {address}'
 
     [[snmp.scan]]
     name = 'onesixtyone'
-    command = 'onesixtyone -c /usr/share/seclists/Discovery/SNMP/common-snmp-community-strings-onesixtyone.txt -dd {address} 2>&1 | tee "{scandir}/{protocol}_{port}_snmp_onesixtyone.txt"'
+    command = 'onesixtyone -c /usr/share/seclists/Discovery/SNMP/common-snmp-community-strings-onesixtyone.txt -dd {address} 2>&1 | tee "{scandir}/_{protocol}_{port}_snmp_onesixtyone.txt"'
     run_once = true
     ports.udp = [161]
 
     [[snmp.scan]]
     name = 'snmpwalk'
-    command = 'snmpwalk -c public -v 1 {address} 2>&1 | tee "{scandir}/{protocol}_{port}_snmp_snmpwalk.txt"'
+    command = 'snmpwalk -c public -v 1 {address} 2>&1 | tee "{scandir}/_{protocol}_{port}_snmp_snmpwalk.txt"'
     run_once = true
     ports.udp = [161]
 
     [[snmp.scan]]
     name = 'snmpwalk-system-processes'
-    command = 'snmpwalk -c public -v 1 {address} 1.3.6.1.2.1.25.1.6.0 2>&1 | tee "{scandir}/{protocol}_{port}_snmp_snmpwalk_system_processes.txt"'
+    command = 'snmpwalk -c public -v 1 {address} 1.3.6.1.2.1.25.1.6.0 2>&1 | tee "{scandir}/_{protocol}_{port}_snmp_snmpwalk_system_processes.txt"'
     run_once = true
     ports.udp = [161]
 
     [[snmp.scan]]
     name = 'snmpwalk-running-processes'
-    command = 'snmpwalk -c public -v 1 {address} 1.3.6.1.2.1.25.4.2.1.2 2>&1 | tee "{scandir}/{protocol}_{port}_snmp_snmpwalk_running_processes.txt"'
+    command = 'snmpwalk -c public -v 1 {address} 1.3.6.1.2.1.25.4.2.1.2 2>&1 | tee "{scandir}/_{protocol}_{port}_snmp_snmpwalk_running_processes.txt"'
     run_once = true
     ports.udp = [161]
 
     [[snmp.scan]]
     name = 'snmpwalk-process-paths'
-    command = 'snmpwalk -c public -v 1 {address} 1.3.6.1.2.1.25.4.2.1.4 2>&1 | tee "{scandir}/{protocol}_{port}_snmp_snmpwalk_process_paths.txt"'
+    command = 'snmpwalk -c public -v 1 {address} 1.3.6.1.2.1.25.4.2.1.4 2>&1 | tee "{scandir}/_{protocol}_{port}_snmp_snmpwalk_process_paths.txt"'
     run_once = true
     ports.udp = [161]
 
     [[snmp.scan]]
     name = 'snmpwalk-storage-units'
-    command = 'snmpwalk -c public -v 1 {address} 1.3.6.1.2.1.25.2.3.1.4 2>&1 | tee "{scandir}/{protocol}_{port}_snmp_snmpwalk_storage_units.txt"'
+    command = 'snmpwalk -c public -v 1 {address} 1.3.6.1.2.1.25.2.3.1.4 2>&1 | tee "{scandir}/_{protocol}_{port}_snmp_snmpwalk_storage_units.txt"'
     run_once = true
     ports.udp = [161]
 
     [[snmp.scan]]
     name = 'snmpwalk-software-names'
-    command = 'snmpwalk -c public -v 1 {address} 1.3.6.1.2.1.25.6.3.1.2 2>&1 | tee "{scandir}/{protocol}_{port}_snmp_snmpwalk_software_names.txt"'
+    command = 'snmpwalk -c public -v 1 {address} 1.3.6.1.2.1.25.6.3.1.2 2>&1 | tee "{scandir}/_{protocol}_{port}_snmp_snmpwalk_software_names.txt"'
     run_once = true
     ports.udp = [161]
 
     [[snmp.scan]]
     name = 'snmpwalk-user-accounts'
-    command = 'snmpwalk -c public -v 1 {address} 1.3.6.1.4.1.77.1.2.25 2>&1 | tee "{scandir}/{protocol}_{port}_snmp_snmpwalk_user_accounts.txt"'
+    command = 'snmpwalk -c public -v 1 {address} 1.3.6.1.4.1.77.1.2.25 2>&1 | tee "{scandir}/_{protocol}_{port}_snmp_snmpwalk_user_accounts.txt"'
     run_once = true
     ports.udp = [161]
 
     [[snmp.scan]]
     name = 'snmpwalk-tcp-ports'
-    command = 'snmpwalk -c public -v 1 {address} 1.3.6.1.2.1.6.13.1.3 2>&1 | tee "{scandir}/{protocol}_{port}_snmp_snmpwalk_tcp_ports.txt"'
+    command = 'snmpwalk -c public -v 1 {address} 1.3.6.1.2.1.6.13.1.3 2>&1 | tee "{scandir}/_{protocol}_{port}_snmp_snmpwalk_tcp_ports.txt"'
     run_once = true
     ports.udp = [161]
 
@@ -554,7 +554,7 @@ service-names = [
 
     [[telnet.scan]]
     name = 'nmap-telnet'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,telnet-encryption,telnet-ntlm-info" -oN "{scandir}/{protocol}_{port}_telnet-nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_telnet_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,telnet-encryption,telnet-ntlm-info" -oA "{scandir}/_{protocol}_{port}_telnet-nmap" {address}'
 
 [tftp]
 
@@ -564,7 +564,7 @@ service-names = [
 
     [[tftp.scan]]
     name = 'nmap-tftp'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,tftp-enum" -oN "{scandir}/{protocol}_{port}_tftp-nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_tftp_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,tftp-enum" -oA "{scandir}/_{protocol}_{port}_tftp-nmap" {address}'
 
 [vnc]
 
@@ -574,4 +574,4 @@ service-names = [
 
     [[vnc.scan]]
     name = 'nmap-vnc'
-    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(vnc* or realvnc* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" --script-args="unsafe=1" -oN "{scandir}/{protocol}_{port}_vnc_nmap.txt" -oX "{scandir}/xml/{protocol}_{port}_vnc_nmap.xml" {address}'
+    command = 'nmap {nmap_extra} -sV -p {port} --script="banner,(vnc* or realvnc* or ssl*) and not (brute or broadcast or dos or external or fuzzer)" --script-args="unsafe=1" -oA "{scandir}/_{protocol}_{port}_vnc_nmap" {address}'

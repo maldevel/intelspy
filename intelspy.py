@@ -126,8 +126,6 @@ DbConnection = None
 concurrent_scans = 1
 concurrent_targets = 1
 
-analyze_only = False
-
 
 
 #####################################################################################################################
@@ -388,7 +386,12 @@ async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
         error('Task {bred}{tag}{rst} on {byellow}{address}{rst} returned non-zero exit code: {process.returncode}')
         async with target.lock:
             with open(os.path.join(reportdir, '_errors.log'), 'a') as file:
-                file.writelines(e('[*] Task {tag} returned non-zero exit code: {process.returncode}. Command: {cmd}\n'))
+                ts = datetime.now().strftime("%d/%b/%Y:%H:%M:%S")
+                tz = datetime.now(timezone.utc).astimezone().strftime('%z')
+                hostname = socket.gethostname()
+                timestp = "[{0} {1}] {2}".format(ts,tz,hostname)
+                file.writelines(e('{timestp} Task {tag} returned non-zero exit code: {process.returncode}. Command: {cmd}\n'))
+                #file.writelines(e('[*] Task {tag} returned non-zero exit code: {process.returncode}. Command: {cmd}\n'))
     else:
         info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
 
@@ -778,114 +781,114 @@ async def scan_services(loop, semaphore, target):
                         with open(os.path.join(reportdir, 'notes.txt'), 'a') as file:
                             file.writelines(e('[*] {service} found on {protocol}/{port}.\n\n'))
 
-                        # if protocol == 'udp':
-                        #     nmap_extra = nmap + " -sU"
-                        # else:
-                        #     nmap_extra = nmap
+                        if protocol == 'udp':
+                            nmap_extra = nmap + " -sU"
+                        else:
+                            nmap_extra = nmap
 
-                        # secure = True if 'ssl' in service or 'tls' in service else False
+                        secure = True if 'ssl' in service or 'tls' in service else False
 
-                        # # Special cases for HTTP.
-                        # scheme = 'https' if 'https' in service or 'ssl' in service or 'tls' in service else 'http'
+                        # Special cases for HTTP.
+                        scheme = 'https' if 'https' in service or 'ssl' in service or 'tls' in service else 'http'
 
-                        # if service.startswith('ssl/') or service.startswith('tls/'):
-                        #     service = service[4:]
+                        if service.startswith('ssl/') or service.startswith('tls/'):
+                            service = service[4:]
 
-                        # for service_scan in service_scans_config:
-                        #     # Skip over configurable variables since the python toml parser cannot iterate over tables only.
-                        #     if service_scan in ['username_wordlist', 'password_wordlist']:
-                        #         continue
+                        for service_scan in service_scans_config:
+                            # Skip over configurable variables since the python toml parser cannot iterate over tables only.
+                            if service_scan in ['username_wordlist', 'password_wordlist']:
+                                continue
 
-                        #     ignore_service = False
-                        #     if 'ignore-service-names' in service_scans_config[service_scan]:
-                        #         for ignore_service_name in service_scans_config[service_scan]['ignore-service-names']:
-                        #             if re.search(ignore_service_name, service):
-                        #                 ignore_service = True
-                        #                 break
+                            ignore_service = False
+                            if 'ignore-service-names' in service_scans_config[service_scan]:
+                                for ignore_service_name in service_scans_config[service_scan]['ignore-service-names']:
+                                    if re.search(ignore_service_name, service):
+                                        ignore_service = True
+                                        break
 
-                        #     if ignore_service:
-                        #         continue
+                            if ignore_service:
+                                continue
 
-                        #     matched_service = False
+                            matched_service = False
 
-                        #     if 'service-names' in service_scans_config[service_scan]:
-                        #         for service_name in service_scans_config[service_scan]['service-names']:
-                        #             if re.search(service_name, service):
-                        #                 matched_service = True
-                        #                 break
+                            if 'service-names' in service_scans_config[service_scan]:
+                                for service_name in service_scans_config[service_scan]['service-names']:
+                                    if re.search(service_name, service):
+                                        matched_service = True
+                                        break
 
-                        #     if not matched_service:
-                        #         continue
+                            if not matched_service:
+                                continue
 
-                        #     if 'manual' in service_scans_config[service_scan]:
-                        #         heading = False
-                        #         with open(os.path.join(reportdir, '_manual_commands.log'), 'a') as file:
-                        #             for manual in service_scans_config[service_scan]['manual']:
-                        #                 if 'description' in manual:
-                        #                     if not heading:
-                        #                         file.writelines(e('[*] {service} on {protocol}/{port}\n\n'))
-                        #                         heading = True
-                        #                     description = manual['description']
-                        #                     file.writelines(e('\t[-] {description}\n\n'))
-                        #                 if 'commands' in manual:
-                        #                     if not heading:
-                        #                         file.writelines(e('[*] {service} on {protocol}/{port}\n\n'))
-                        #                         heading = True
-                        #                     for manual_command in manual['commands']:
-                        #                         manual_command = e(manual_command)
-                        #                         file.writelines('\t\t' + e('{manual_command}\n\n'))
-                        #             if heading:
-                        #                 file.writelines('\n')
+                            if 'manual' in service_scans_config[service_scan]:
+                                heading = False
+                                with open(os.path.join(reportdir, '_manual_commands.log'), 'a') as file:
+                                    for manual in service_scans_config[service_scan]['manual']:
+                                        if 'description' in manual:
+                                            if not heading:
+                                                file.writelines(e('[*] {service} on {protocol}/{port}\n\n'))
+                                                heading = True
+                                            description = manual['description']
+                                            file.writelines(e('\t[-] {description}\n\n'))
+                                        if 'commands' in manual:
+                                            if not heading:
+                                                file.writelines(e('[*] {service} on {protocol}/{port}\n\n'))
+                                                heading = True
+                                            for manual_command in manual['commands']:
+                                                manual_command = e(manual_command)
+                                                file.writelines('\t\t' + e('{manual_command}\n\n'))
+                                    if heading:
+                                        file.writelines('\n')
 
-                        #     if 'scan' in service_scans_config[service_scan]:
-                        #         for scan in service_scans_config[service_scan]['scan']:
+                            if 'scan' in service_scans_config[service_scan]:
+                                for scan in service_scans_config[service_scan]['scan']:
 
-                        #             if 'name' in scan:
-                        #                 name = scan['name']
-                        #                 if 'command' in scan:
-                        #                     tag = e('{protocol}/{port}/{name}')
-                        #                     command = scan['command']
+                                    if 'name' in scan:
+                                        name = scan['name']
+                                        if 'command' in scan:
+                                            tag = e('{protocol}/{port}/{name}')
+                                            command = scan['command']
 
-                        #                     if 'ports' in scan:
-                        #                         port_match = False
+                                            if 'ports' in scan:
+                                                port_match = False
 
-                        #                         if protocol == 'tcp':
-                        #                             if 'tcp' in scan['ports']:
-                        #                                 for tcp_port in scan['ports']['tcp']:
-                        #                                     if port == tcp_port:
-                        #                                         port_match = True
-                        #                                         break
-                        #                         elif protocol == 'udp':
-                        #                             if 'udp' in scan['ports']:
-                        #                                 for udp_port in scan['ports']['udp']:
-                        #                                     if port == udp_port:
-                        #                                         port_match = True
-                        #                                         break
+                                                if protocol == 'tcp':
+                                                    if 'tcp' in scan['ports']:
+                                                        for tcp_port in scan['ports']['tcp']:
+                                                            if port == tcp_port:
+                                                                port_match = True
+                                                                break
+                                                elif protocol == 'udp':
+                                                    if 'udp' in scan['ports']:
+                                                        for udp_port in scan['ports']['udp']:
+                                                            if port == udp_port:
+                                                                port_match = True
+                                                                break
 
-                        #                         if port_match == False:
-                        #                             warn(Fore.YELLOW + '[' + Style.BRIGHT + tag + Style.NORMAL + '] Scan cannot be run against {protocol} port {port}. Skipping.' + Fore.RESET)
-                        #                             continue
+                                                if port_match == False:
+                                                    warn(Fore.YELLOW + '[' + Style.BRIGHT + tag + Style.NORMAL + '] Scan cannot be run against {protocol} port {port}. Skipping.' + Fore.RESET)
+                                                    continue
 
-                        #                     if 'run_once' in scan and scan['run_once'] == True:
-                        #                         scan_tuple = (name,)
-                        #                         if scan_tuple in target.scans:
-                        #                             warn(Fore.YELLOW + '[' + Style.BRIGHT + tag + ' on ' + address + Style.NORMAL + '] Scan should only be run once and it appears to have already been queued. Skipping.' + Fore.RESET)
-                        #                             continue
-                        #                         else:
-                        #                             target.scans.append(scan_tuple)
-                        #                     else:
-                        #                         scan_tuple = (protocol, port, service, name)
-                        #                         if scan_tuple in target.scans:
-                        #                             warn(Fore.YELLOW + '[' + Style.BRIGHT + tag + ' on ' + address + Style.NORMAL + '] Scan appears to have already been queued, but it is not marked as run_once in service-scans.toml. Possible duplicate tag? Skipping.' + Fore.RESET)
-                        #                             continue
-                        #                         else:
-                        #                             target.scans.append(scan_tuple)
+                                            if 'run_once' in scan and scan['run_once'] == True:
+                                                scan_tuple = (name,)
+                                                if scan_tuple in target.scans:
+                                                    warn(Fore.YELLOW + '[' + Style.BRIGHT + tag + ' on ' + address + Style.NORMAL + '] Scan should only be run once and it appears to have already been queued. Skipping.' + Fore.RESET)
+                                                    continue
+                                                else:
+                                                    target.scans.append(scan_tuple)
+                                            else:
+                                                scan_tuple = (protocol, port, service, name)
+                                                if scan_tuple in target.scans:
+                                                    warn(Fore.YELLOW + '[' + Style.BRIGHT + tag + ' on ' + address + Style.NORMAL + '] Scan appears to have already been queued, but it is not marked as run_once in service-scans.toml. Possible duplicate tag? Skipping.' + Fore.RESET)
+                                                    continue
+                                                else:
+                                                    target.scans.append(scan_tuple)
 
-                        #                     patterns = []
-                        #                     if 'pattern' in scan:
-                        #                         patterns = scan['pattern']
+                                            patterns = []
+                                            if 'pattern' in scan:
+                                                patterns = scan['pattern']
 
-                        #                     pending.add(asyncio.ensure_future(run_cmd(semaphore, e(command), target, tag=tag, patterns=patterns)))
+                                            pending.add(asyncio.ensure_future(run_cmd(semaphore, e(command), target, tag=tag, patterns=patterns)))
     #return services
     return target_services
 
@@ -901,9 +904,8 @@ def scan_live_hosts(target, concurrent_scans):
     reportdir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'report')
     target.reportdir = reportdir
 
-    if not analyze_only:
-        Path(livehostsdir).mkdir(parents=True, exist_ok=True)
-        Path(reportdir).mkdir(parents=True, exist_ok=True)
+    Path(livehostsdir).mkdir(parents=True, exist_ok=True)
+    Path(reportdir).mkdir(parents=True, exist_ok=True)
 
     # Use a lock when writing to specific files that may be written to by other asynchronous functions.
     target.lock = asyncio.Lock()
@@ -929,14 +931,13 @@ def scan_host(target, concurrent_scans):
     start_time = time.time()
     info('Scanning target {byellow}{target.address}{rst}')
 
-    scandir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'scans', 'ports')
+    scandir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'scans')
     target.scansdir = scandir
     reportdir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'report')
     target.reportdir = reportdir
 
-    if not analyze_only:
-        Path(scandir).mkdir(parents=True, exist_ok=True)
-        Path(reportdir).mkdir(parents=True, exist_ok=True)
+    Path(scandir).mkdir(parents=True, exist_ok=True)
+    Path(reportdir).mkdir(parents=True, exist_ok=True)
 
     # Use a lock when writing to specific files that may be written to by other asynchronous functions.
     target.lock = asyncio.Lock()
@@ -985,7 +986,7 @@ def isRoot():
 
 
 #####################################################################################################################
-def createProjectDirStructure(projName, workingDir, analyze):
+def createProjectDirStructure(projName, workingDir):
         global ProjectDir, CommandsDir, DatabaseDir, LogsDir, ReportDir, TargetsDir, LogsFile
         global DatabaseFile, FinalReportMDFile, FinalReportHTMLFile, CommandsFile
 
@@ -1002,25 +1003,23 @@ def createProjectDirStructure(projName, workingDir, analyze):
         FinalReportHTMLFile = FinalReportMDFile.replace('.md', '.html')
         CommandsFile = os.path.join(CommandsDir, "_commands.log")
 
-        if not analyze:
-            Path(CommandsDir).mkdir(parents=True, exist_ok=True)
-            Path(DatabaseDir).mkdir(parents=True, exist_ok=True)
-            Path(LogsDir).mkdir(parents=True, exist_ok=True)
-            Path(ReportDir).mkdir(parents=True, exist_ok=True)
-            Path(TargetsDir).mkdir(parents=True, exist_ok=True)
-            info('Creating project directory structure \'{byellow}{ProjectDir}{rst}\'.')
+        Path(CommandsDir).mkdir(parents=True, exist_ok=True)
+        Path(DatabaseDir).mkdir(parents=True, exist_ok=True)
+        Path(LogsDir).mkdir(parents=True, exist_ok=True)
+        Path(ReportDir).mkdir(parents=True, exist_ok=True)
+        Path(TargetsDir).mkdir(parents=True, exist_ok=True)
+        info('Creating project directory structure \'{byellow}{ProjectDir}{rst}\'.')
 
 
 
 #####################################################################################################################
-def dbconnect(analyze):
+def dbconnect():
     global DbConnection
 
     try:
         DbConnection = sqlite3.connect(DatabaseFile)
-        if not analyze:
-            dbcreateTargetsTbl()
-            dbcreateServicesTbl()
+        dbcreateTargetsTbl()
+        dbcreateServicesTbl()
 
         info('Database connection established. Database file \'{byellow}{DatabaseFile}{rst}\'.')
     except Exception as e:
@@ -1278,7 +1277,6 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--project-name', action='store', type=str, help='project name', required=True)
     parser.add_argument('-w', '--working-dir', action='store', type=str, help='working directory', required=True)
 
-    parser.add_argument('--analyze', metavar='<datetime>', help='analyze results, no scan (e.g. 2020-03-14_18-07-32)', required=False, default=False)
     parser.add_argument('--exclude', metavar='<host1[,host2][,host3],...>', help='exclude hosts/networks', required=False)
     parser.add_argument('-s','--speed', help='0-5, set timing template (higher is faster) (default: 4)', required=False, default=4)
 
@@ -1323,17 +1321,12 @@ if __name__ == '__main__':
         error('Argument --livehost-profile: must reference a live host scan profile defined in {live_host_scan_profiles_config_file}. No such profile found: {live_host_scan_profile}')
         errors = True
 
-    analyze_only = args.analyze
-
-    if analyze_only:
-        CurrentDateTime = analyze_only
-
     if args.exclude:
         nmap = "--exclude {}".format(args.exclude)
 
-    createProjectDirStructure(args.project_name, args.working_dir, analyze_only)
+    createProjectDirStructure(args.project_name, args.working_dir)
 
-    dbconnect(analyze_only)
+    dbconnect()
 
     if not isRoot():
         dbdisconnect()
