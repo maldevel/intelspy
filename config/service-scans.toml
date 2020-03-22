@@ -131,40 +131,33 @@ ignore-service-names = [
 
     [[http.scan]]
     name = 'gobuster'
-    command = 'gobuster dir -u {scheme}://{address}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/common.txt -e -z -k -l -o "{scandir}/_{protocol}_{port}_{scheme}_gobuster.txt"'
+    command = 'gobuster dir -u {scheme}://{address}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/common.txt -e -z -k -l -o "{scandir}/_{protocol}_{port}_{scheme}_gobuster_common.txt"'
 
     [[http.manual]]
     description = '(dirsearch) Multi-threaded recursive directory/file enumeration for web servers using various wordlists:'
     commands = [
-        'dirsearch -u {scheme}://{address}:{port}/ -t 16 -r -e txt,html,php,asp,aspx,jsp -f -w /usr/share/seclists/Discovery/Web-Content/big.txt --plain-text-report="{scandir}/_{protocol}_{port}_{scheme}_dirsearch_big.txt"',
-        'dirsearch -u {scheme}://{address}:{port}/ -t 16 -r -e txt,html,php,asp,aspx,jsp -f -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt --plain-text-report="{scandir}/_{protocol}_{port}_{scheme}_dirsearch_dirbuster.txt"'
+        'dirsearch -b -u {scheme}://{address}:{port}/ -t 16 -r -E -f -w /usr/share/seclists/Discovery/Web-Content/big.txt --plain-text-report="{scandir}/_{protocol}_{port}_{scheme}_dirsearch_big.txt"',
+        'dirsearch -b -u {scheme}://{address}:{port}/ -t 16 -r -E -f -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt --plain-text-report="{scandir}/_{protocol}_{port}_{scheme}_dirsearch_medium.txt"'
     ]
 
     [[http.manual]]
     description = '(dirb) Recursive directory/file enumeration for web servers using various wordlists (same as dirsearch above):'
     commands = [
-        'dirb {scheme}://{address}:{port}/ /usr/share/seclists/Discovery/Web-Content/big.txt -l -r -S -X ",.txt,.html,.php,.asp,.aspx,.jsp" -o "{scandir}/_{protocol}_{port}_{scheme}_dirb_big.txt"',
-        'dirb {scheme}://{address}:{port}/ /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -l -r -S -X ",.txt,.html,.php,.asp,.aspx,.jsp" -o "{scandir}/_{protocol}_{port}_{scheme}_dirb_dirbuster.txt"'
+        'dirb {scheme}://{address}:{port}/ /usr/share/seclists/Discovery/Web-Content/big.txt -l -r -S -o "{scandir}/_{protocol}_{port}_{scheme}_dirb_big.txt"',
+        'dirb {scheme}://{address}:{port}/ /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -l -r -S -o "{scandir}/_{protocol}_{port}_{scheme}_dirb_dirbuster.txt"'
     ]
 
     [[http.manual]]
     description = '(gobuster v3) Directory/file enumeration for web servers using various wordlists (same as dirb above):'
     commands = [
-        'gobuster dir -u {scheme}://{address}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/big.txt -e -k -l -s "200,204,301,302,307,403,500" -x "txt,html,php,asp,aspx,jsp" -z -o "{scandir}/_{protocol}_{port}_{scheme}_gobuster_big.txt"',
-        'gobuster dir -u {scheme}://{address}:{port}/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e -k -l -s "200,204,301,302,307,403,500" -x "txt,html,php,asp,aspx,jsp" -z -o "{scandir}/_{protocol}_{port}_{scheme}_gobuster_dirbuster.txt"'
-    ]
-
-    [[http.manual]]
-    description = '(gobuster v1 & v2) Directory/file enumeration for web servers using various wordlists (same as dirb above):'
-    commands = [
-        'gobuster -u {scheme}://{address}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/big.txt -e -k -l -s "200,204,301,302,307,403,500" -x "txt,html,php,asp,aspx,jsp" -o "{scandir}/_{protocol}_{port}_{scheme}_gobuster_big.txt"',
-        'gobuster -u {scheme}://{address}:{port}/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e -k -l -s "200,204,301,302,307,403,500" -x "txt,html,php,asp,aspx,jsp" -o "{scandir}/_{protocol}_{port}_{scheme}_gobuster_dirbuster.txt"'
+        'gobuster dir -u {scheme}://{address}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/big.txt -e -z -k -l -o "{scandir}/_{protocol}_{port}_{scheme}_gobuster_big.txt"',
+        'gobuster dir -u {scheme}://{address}:{port}/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e -z -k -l -o "{scandir}/_{protocol}_{port}_{scheme}_gobuster_medium.txt"'
     ]
 
     [[http.manual]]
     description = '(wpscan) WordPress Security Scanner (useful if WordPress is found):'
     commands = [
-        'wpscan --url {scheme}://{address}:{port}/ --no-update -e vp,vt,tt,cb,dbe,u,m --plugins-detection aggressive --plugins-version-detection aggressive -f cli-no-color 2>&1 | tee "{scandir}/_{protocol}_{port}_{scheme}_wpscan.txt"'
+        'wpscan -v --url {scheme}://{address}:{port}/ --update -e vp,vt,tt,cb,dbe,u,m --plugins-detection aggressive --plugins-version-detection aggressive -f cli-no-color 2>&1 | tee "{scandir}/_{protocol}_{port}_{scheme}_wpscan.txt"'
     ]
 
     [[http.manual]]
@@ -217,7 +210,7 @@ service-names = [
     [[ldap.manual]]
     description = 'ldapsearch command (modify before running)'
     commands = [
-        'ldapsearch -x -D "<username>" -w "<password>"" -p {port} -h {address} -b "dc=example,dc=com" -s sub "(objectclass=*) 2>&1 | tee > "{scandir}/_{protocol}_{port}_ldap_all-entries.txt"'
+        'ldapsearch -x -D "<username>" -w "<password>" -p {port} -h {address} -b "dc=example,dc=com" -s sub "(objectclass=*) 2>&1 | tee > "{scandir}/_{protocol}_{port}_ldap_all-entries.txt"'
     ]
 
 [mongodb]
@@ -301,10 +294,6 @@ service-names = [
     command = 'tnscmd10g version -h {address} -p {port} 2>&1 | tee "{scandir}/_{protocol}_{port}_oracle_tnscmd_version.txt"'
 
     [[oracle.scan]]
-    name = 'oracle-tnscmd-version'
-    command = 'tnscmd10g version -h {address} -p {port} 2>&1 | tee "{scandir}/_{protocol}_{port}_oracle_tnscmd_version.txt"'
-
-    [[oracle.scan]]
     name = 'oracle-scanner'
     command = 'oscanner -v -s {address} -P {port} 2>&1 | tee "{scandir}/_{protocol}_{port}_oracle_scanner.txt"'
 
@@ -315,12 +304,12 @@ service-names = [
     [[oracle.manual]]
     description = 'Install ODAT (https://github.com/quentinhardy/odat) and run the following commands:'
     commands = [
-        'python odat.py tnscmd -s {address} -p {port} --ping',
-        'python odat.py tnscmd -s {address} -p {port} --version',
-        'python odat.py tnscmd -s {address} -p {port} --status',
-        'python odat.py sidguesser -s {address} -p {port}',
-        'python odat.py passwordguesser -s {address} -p {port} -d <sid> --accounts-file accounts/accounts_multiple.txt',
-        'python odat.py tnspoison -s {address} -p {port} -d <sid> --test-module'
+        'python3 odat.py tnscmd -s {address} -p {port} --ping',
+        'python3 odat.py tnscmd -s {address} -p {port} --version',
+        'python3 odat.py tnscmd -s {address} -p {port} --status',
+        'python3 odat.py sidguesser -s {address} -p {port}',
+        'python3 odat.py passwordguesser -s {address} -p {port} -d <sid> --accounts-file accounts/accounts_multiple.txt',
+        'python3 odat.py tnspoison -s {address} -p {port} -d <sid> --test-module'
     ]
 
     [[oracle.manual]]
@@ -354,8 +343,8 @@ service-names = [
     [[rdp.manual]]
     description = 'Bruteforce logins:'
     commands = [
-        'hydra -L "{username_wordlist}" -P "{password_wordlist}" -e nsr -s {port} -o "{scandir}/_{protocol}_{port}_rdp_hydra.txt" rdp://{address}',
-        'medusa -U "{username_wordlist}" -P "{password_wordlist}" -e ns -n {port} -O "{scandir}/_{protocol}_{port}_rdp_medusa.txt" -M rdp -h {address}'
+        'hydra -v -L "{username_wordlist}" -P "{password_wordlist}" -e nsr -s {port} -o "{scandir}/_{protocol}_{port}_rdp_hydra.txt" rdp://{address}',
+        'medusa -v 4 -U "{username_wordlist}" -P "{password_wordlist}" -e ns -n {port} -O "{scandir}/_{protocol}_{port}_rdp_medusa.txt" -M rdp -h {address}'
     ]
 
 [rmi]
@@ -414,8 +403,8 @@ service-names = [
     [[ssh.manual]]
     description = 'Bruteforce logins:'
     commands = [
-        'hydra -L "{username_wordlist}" -P "{password_wordlist}" -e nsr -s {port} -o "{scandir}/_{protocol}_{port}_ssh_hydra.txt" ssh://{address}',
-        'medusa -U "{username_wordlist}" -P "{password_wordlist}" -e ns -n {port} -O "{scandir}/_{protocol}_{port}_ssh_medusa.txt" -M ssh -h {address}'
+        'hydra -v -L "{username_wordlist}" -P "{password_wordlist}" -e nsr -s {port} -o "{scandir}/_{protocol}_{port}_ssh_hydra.txt" ssh://{address}',
+        'medusa -v 4 -U "{username_wordlist}" -P "{password_wordlist}" -e ns -n {port} -O "{scandir}/_{protocol}_{port}_ssh_medusa.txt" -M ssh -h {address}'
     ]
 [smb]
 
