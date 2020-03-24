@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+# encoding: UTF-8
 
 #    This file is part of IntelSpy
 #    Copyright (C) 2020 @maldevel
@@ -143,8 +144,8 @@ def e(*args, frame_index=1, **kvargs):
     return string.Formatter().vformat(' '.join(args), args, vals)
 
 
-#####################################################################################################################
 
+#####################################################################################################################
 def cprint(*args, type='info', color=Fore.RESET, char='*', sep=' ', end='\n', frame_index=1, file=sys.stdout, **kvargs):
     frame = sys._getframe(frame_index)
 
@@ -317,20 +318,23 @@ async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
 
             for p in global_patterns:
                 matches = re.findall(p['pattern'], line)
+
                 if 'description' in p:
                     for match in matches:
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
+                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
                                 file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
+
                 else:
                     for match in matches:
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
+                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
                                 file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
+
 
             for p in patterns:
                 matches = re.findall(p['pattern'], line)
@@ -339,14 +343,15 @@ async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
+                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
                                 file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
+
                 else:
                     for match in matches:
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
+                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
                                 file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
         else:
             break
@@ -420,25 +425,26 @@ async def parse_port_scan(stream, tag, target, pattern):
 
             for p in global_patterns:
                 matches = re.findall(p['pattern'], line)
+
                 if 'description' in p:
                     for match in matches:
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
+                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
                                 file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
+
                 else:
                     for match in matches:
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
+                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
                                 file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
         else:
             break
 
     return ports
-
 
 
 
@@ -480,25 +486,26 @@ async def parse_service_detection(stream, tag, target, pattern):
 
             for p in global_patterns:
                 matches = re.findall(p['pattern'], line)
+
                 if 'description' in p:
                     for match in matches:
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
+                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
                                 file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
+
                 else:
                     for match in matches:
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.scansdir, '_patterns.log'), 'a') as file:
+                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
                                 file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
         else:
             break
 
     return services
-
 
 
 
@@ -720,7 +727,7 @@ async def ping_and_scan(loop, semaphore, target):
 
                         info('Found live host {bmagenta}{livehost}{rst} on target {byellow}{address}{rst}')
 
-                        with open(os.path.join(reportdir, 'notes.txt'), 'a') as file:
+                        with open(os.path.join(reportdir, '_notes.txt'), 'a') as file:
                             file.writelines(e('[*] Live host {livehost} found on target {address}.\n\n'))
     return live_hosts
 
@@ -783,7 +790,7 @@ async def scan_services(loop, semaphore, target):
 
                         info('Found {bmagenta}{service}{rst} ({bmagenta}{version}{rst}) on {bmagenta}{protocol}/{port}{rst} on target {byellow}{address}{rst}')
 
-                        with open(os.path.join(reportdir, 'notes.txt'), 'a') as file:
+                        with open(os.path.join(reportdir, '_notes.txt'), 'a') as file:
                             file.writelines(e('[*] {service} found on {protocol}/{port}.\n\n'))
 
                         if protocol == 'udp':
