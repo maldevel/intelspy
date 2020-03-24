@@ -129,6 +129,8 @@ DbConnection = None
 concurrent_scans = 1
 concurrent_targets = 1
 
+Matched_Patterns_Report = []
+
 
 
 #####################################################################################################################
@@ -309,7 +311,9 @@ if 'password_wordlist' in service_scans_config:
 
 #####################################################################################################################
 async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
+    matched_patterns = []
     address = target.address
+
     while True:
         line = await stream.readline()
         if line:
@@ -325,15 +329,26 @@ async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
                             with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
-                                file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
+                                log_line = e('{tag} - {target.address} - ' + p['description'] + '\n\n')
+                                file.writelines(log_line)
+                                mp = e('{target.address} - ' + p['description'] + '\n\n').strip()
+                                if mp not in matched_patterns:
+                                    matched_patterns.append(mp)
+                                    
+
 
                 else:
                     for match in matches:
                         if verbose >= 1:
-                            info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
+                            info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta} {bblue}{match}{rst}')
                         async with target.lock:
                             with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
-                                file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
+                                log_line = e('{tag} - {target.address} - {match}\n\n')
+                                file.writelines(log_line)
+                                mp = e('{target.address} - ' + p['description'] + '\n\n').strip()
+                                if mp not in matched_patterns:
+                                    matched_patterns.append(mp)
+                                    
 
 
             for p in patterns:
@@ -344,24 +359,35 @@ async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
                             with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
-                                file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
+                                log_line = e('{tag} - {target.address} - ' + p['description'] + '\n\n')
+                                file.writelines(log_line)
+                                mp = e('{target.address} - ' + p['description'] + '\n\n').strip()
+                                if mp not in matched_patterns:
+                                    matched_patterns.append(mp)
+                                    
 
                 else:
                     for match in matches:
                         if verbose >= 1:
-                            info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
+                            info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta} {bblue}{match}{rst}')
                         async with target.lock:
                             with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
-                                file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
+                                log_line = e('{tag} - {target.address} - {match}\n\n')
+                                file.writelines(log_line)
+                                imp = e('{target.address} - ' + p['description'] + '\n\n').strip()
+                                if mp not in matched_patterns:
+                                    matched_patterns.append(mp)
+
         else:
             break
 
-
+    return matched_patterns
 
 
 #####################################################################################################################
 async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
     async with semaphore:
+        matched_patterns = []
         address = target.address
         reportdir = target.reportdir
         scandir = target.scansdir
@@ -379,18 +405,27 @@ async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
         async with target.lock:
             target.running_tasks.append(tag)
 
-        await asyncio.wait([
+        output = [
             read_stream(process.stdout, target, tag=tag, patterns=patterns),
             read_stream(process.stderr, target, tag=tag, patterns=patterns, color=Fore.RED)
-        ])
+        ]
+
+        # await asyncio.wait([
+        #     read_stream(process.stdout, target, tag=tag, patterns=patterns),
+        #     read_stream(process.stderr, target, tag=tag, patterns=patterns, color=Fore.RED)
+        # ])
+
+        results = await asyncio.gather(*output)
 
         await process.wait()
         async with target.lock:
             target.running_tasks.remove(tag)
+
         elapsed_time = calculate_elapsed_time(start_time)
 
     if process.returncode != 0:
         error('Task {bred}{tag}{rst} on {byellow}{address}{rst} returned non-zero exit code: {process.returncode}')
+
         async with target.lock:
             with open(os.path.join(reportdir, '_errors.log'), 'a') as file:
                 ts = datetime.now().strftime("%d/%b/%Y:%H:%M:%S")
@@ -402,13 +437,18 @@ async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
     else:
         info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
 
-    return {'returncode': process.returncode, 'name': 'run_cmd'}
+    #results = results[0][0]
+    #print(results)
+    if results[0]:
+        matched_patterns = results[0]
 
+    return {'returncode': process.returncode, 'name': 'run_cmd', 'patterns': matched_patterns}
 
 
 
 #####################################################################################################################
 async def parse_port_scan(stream, tag, target, pattern):
+    matched_patterns = []
     address = target.address
     ports = []
 
@@ -432,25 +472,38 @@ async def parse_port_scan(stream, tag, target, pattern):
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
                             with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
-                                file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
+                                log_line = e('{tag} - {target.address} - ' + p['description'] + '\n\n')
+                                file.writelines(log_line)
+                                mp = e('{target.address} - ' + p['description'] + '\n\n').strip()
+                                if mp not in matched_patterns:
+                                    matched_patterns.append(mp)
+                                    
 
                 else:
                     for match in matches:
                         if verbose >= 1:
-                            info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
+                            info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta} {bblue}{match}{rst}')
                         async with target.lock:
                             with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
-                                file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
+                                log_line = e('{tag} - {target.address} - {match}\n\n')
+                                file.writelines(log_line)
+                                mp = e('{target.address} - ' + p['description'] + '\n\n').strip()
+                                if mp not in matched_patterns:
+                                    matched_patterns.append(mp)
+                                    
+
         else:
             break
 
-    return ports
+    return ports,matched_patterns
 
 
 
 #####################################################################################################################
 async def parse_live_host_detection(stream, tag, target, pattern):
+    matched_patterns = []
     address = target.address
+    host = ''
     livehosts = []
 
     while True:
@@ -460,17 +513,50 @@ async def parse_live_host_detection(stream, tag, target, pattern):
             debug(Fore.BLUE + '[' + Style.BRIGHT + address + ' ' + tag + Style.NORMAL + '] ' + Fore.RESET + '{line}', color=Fore.BLUE)
 
             parse_match = re.search(pattern, line)
+            
             if parse_match:
                 livehosts.append(parse_match.group('address'))
+                host = parse_match.group('address')
+
+            for p in global_patterns:
+                matches = re.findall(p['pattern'], line)
+
+                if 'description' in p:
+                    for match in matches:
+                        if verbose >= 1:
+                            info('Task {bgreen}{tag}{rst} on {byellow}{host}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
+                        async with target.lock:
+                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
+                                log_line = e('{tag} - {host} - ' + p['description'] + '\n\n')
+                                file.writelines(log_line)
+                                mp = e('{host} - ' + p['description'] + '\n\n').strip()
+                                if mp not in matched_patterns:
+                                    matched_patterns.append(mp)
+                                    
+
+                else:
+                    for match in matches:
+                        if verbose >= 1:
+                            info('Task {bgreen}{tag}{rst} on {byellow}{host}{rst} - {bmagenta} {bblue}{match}{rst}')
+                        async with target.lock:
+                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
+                                log_line = e('{tag} - {host} - {match}\n\n')
+                                file.writelines(log_line)
+                                mp = e('{host} - ' + p['description'] + '\n\n').strip()
+                                if mp not in matched_patterns:
+                                    matched_patterns.append(mp)
+                                    
+
         else:
             break
 
-    return livehosts
+    return livehosts, matched_patterns
 
 
 
 #####################################################################################################################
 async def parse_service_detection(stream, tag, target, pattern):
+    matched_patterns = []
     address = target.address
     services = []
 
@@ -493,19 +579,31 @@ async def parse_service_detection(stream, tag, target, pattern):
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
                             with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
-                                file.writelines(e('{tag} - ' + p['description'] + '\n\n'))
+                                log_line = e('{tag} - {target.address} - ' + p['description'] + '\n\n')
+                                file.writelines(log_line)
+                                mp = e('{target.address} - ' + p['description'] + '\n\n').strip()
+                                if mp not in matched_patterns:
+                                    matched_patterns.append(mp)
+                                    
+
 
                 else:
                     for match in matches:
                         if verbose >= 1:
-                            info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}Matched Pattern: {bblue}{match}{rst}')
+                            info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta} {bblue}{match}{rst}')
                         async with target.lock:
                             with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
-                                file.writelines(e('{tag} - Matched Pattern: {match}\n\n'))
+                                log_line = e('{tag} - {target.address} - {match}\n\n')
+                                file.writelines(log_line)
+                                mp = e('{target.address} - ' + p['description'] + '\n\n').strip()
+                                if mp not in matched_patterns:
+                                    matched_patterns.append(mp)
+                                    
+
         else:
             break
 
-    return services
+    return services,matched_patterns
 
 
 
@@ -556,9 +654,10 @@ async def run_livehostscan(semaphore, tag, target, live_host_detection):
         else:
             info('Live hosts detection {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
 
-        livehosts = results[0]
+        livehosts = results[0][0]
+        matched_patterns = results[0][1]
 
-        return {'returncode': process.returncode, 'name': 'run_livehostscan', 'livehosts': livehosts}
+        return {'returncode': process.returncode, 'name': 'run_livehostscan', 'livehosts': livehosts, 'patterns': matched_patterns}
 
 
 
@@ -566,7 +665,8 @@ async def run_livehostscan(semaphore, tag, target, live_host_detection):
 #####################################################################################################################
 async def run_portscan(semaphore, tag, target, service_detection, port_scan=None):
     async with semaphore:
-
+        ports_matched_patterns = []
+        services_matched_patterns = []
         address = target.address
         reportdir = target.reportdir
         scandir = target.scansdir
@@ -588,6 +688,7 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
 
             start_time = time.time()
             process = await asyncio.create_subprocess_shell(command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, executable='/bin/bash')
+
             async with target.lock:
                 target.running_tasks.append(tag)
 
@@ -612,7 +713,9 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
             else:
                 info('Port scan {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
 
-            ports = results[0]
+            ports = results[0][0]
+            ports_matched_patterns = results[0][1]
+
             if len(ports) == 0:
                 return {'returncode': -1}
 
@@ -657,9 +760,10 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
         else:
             info('Service detection {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
 
-        services = results[0]
+        services = results[0][0]
+        services_matched_patterns = results[0][1]
 
-        return {'returncode': process.returncode, 'name': 'run_portscan', 'services': services}
+        return {'returncode': process.returncode, 'name': 'run_portscan', 'services': services, 'ports_patterns': ports_matched_patterns, 'services_patterns': services_matched_patterns}
 
 
 
@@ -705,6 +809,7 @@ async def ping_and_scan(loop, semaphore, target):
             break
 
     live_hosts = []
+    matched_patterns = []
 
     while True:
         if not pending:
@@ -729,7 +834,12 @@ async def ping_and_scan(loop, semaphore, target):
 
                         with open(os.path.join(reportdir, '_notes.txt'), 'a') as file:
                             file.writelines(e('[*] Live host {livehost} found on target {address}.\n\n'))
-    return live_hosts
+
+                    for pattern in result['patterns']:
+                        if pattern not in matched_patterns:
+                            matched_patterns.append(pattern)
+
+    return live_hosts, matched_patterns
 
 
 
@@ -758,9 +868,9 @@ async def scan_services(loop, semaphore, target):
                     pending.append(run_portscan(semaphore, scan, target, service_detection))
             break
 
-    #services = []
     target_services = {}
     target_services[target.address] = []
+    matched_patterns = []
 
     while True:
         if not pending:
@@ -773,12 +883,24 @@ async def scan_services(loop, semaphore, target):
             result = task.result()
 
             if result['returncode'] == 0:
+
+                if result['name'] == 'run_cmd':
+                    for pattern in result['patterns']:
+                        if pattern not in matched_patterns:
+                            matched_patterns.append(pattern)
+
                 if result['name'] == 'run_portscan':
+                    for pattern in result['ports_patterns']:
+                        if pattern not in matched_patterns:
+                            matched_patterns.append(pattern)
+
+                    for pattern in result['services_patterns']:
+                        if pattern not in matched_patterns:
+                            matched_patterns.append(pattern)
+
                     for service_tuple in result['services']:
                         if service_tuple not in target_services[target.address]:
-                        #if service_tuple not in services:
-                            #services.append(service_tuple)
-                            #services[target.address] = service_tuple
+
                             target_services[target.address].append(service_tuple)
                         else:
                             continue
@@ -901,8 +1023,11 @@ async def scan_services(loop, semaphore, target):
                                                 patterns = scan['pattern']
 
                                             pending.add(asyncio.ensure_future(run_cmd(semaphore, e(command), target, tag=tag, patterns=patterns)))
-    #return services
-    return target_services
+                                            #pending.add(run_cmd(semaphore, e(command), target, tag=tag, patterns=patterns))
+                                            #print(e(command))
+                                            ####
+                                                    
+    return target_services, matched_patterns
 
 
 
@@ -929,10 +1054,11 @@ def scan_live_hosts(target, concurrent_scans):
     semaphore = asyncio.Semaphore(concurrent_scans)
 
     try:
-        live_hosts = loop.run_until_complete(asyncio.gather(ping_and_scan(loop, semaphore, target)))
+        results = loop.run_until_complete(asyncio.gather(ping_and_scan(loop, semaphore, target)))
         elapsed_time = calculate_elapsed_time(start_time)
         info('Finished scanning target {byellow}{target.address}{rst} in {elapsed_time}')
-        return live_hosts
+        return results
+
     except KeyboardInterrupt:
         sys.exit(1)
 
@@ -961,13 +1087,11 @@ def scan_host(target, concurrent_scans):
     semaphore = asyncio.Semaphore(concurrent_scans)
 
     try:
-        # loop.run_until_complete(scan_services(loop, semaphore, target))
-        # elapsed_time = calculate_elapsed_time(start_time)
-        # info('Finished scanning target {byellow}{target.address}{rst} in {elapsed_time}')
-        services = loop.run_until_complete(asyncio.gather(scan_services(loop, semaphore, target)))
+        results = loop.run_until_complete(asyncio.gather(scan_services(loop, semaphore, target)))
         elapsed_time = calculate_elapsed_time(start_time)
         info('Finished scanning target {byellow}{target.address}{rst} in {elapsed_time}')
-        return services
+        return results
+
     except KeyboardInterrupt:
         sys.exit(1)
 
@@ -1141,8 +1265,10 @@ def detect_live_hosts(targetRange):
 
         live_hosts = []
         try:
-            live_hosts_arr = future.result()
-            live_hosts = live_hosts_arr[0]
+            if future.result():
+                results_arr = future.result()
+                live_hosts = results_arr[0][0]
+                matched_patterns = results_arr[0][1]
         except KeyboardInterrupt:
             future.cancel()
             executor.shutdown(wait=False)
@@ -1151,7 +1277,7 @@ def detect_live_hosts(targetRange):
         elapsed_time = calculate_elapsed_time(start_time)
         info('{bgreen}Live Hosts scanning completed in {elapsed_time}!{rst}')
 
-        return live_hosts
+        return live_hosts,matched_patterns
 
 
 
@@ -1299,7 +1425,7 @@ if __name__ == '__main__':
     parser.add_argument('--livehost-profile', action='store', default='default', dest='livehost_profile_name', help='The live host scanning profile to use (defined in live-host-scan-profiles.toml). Default: %(default)s')
 
     parser.add_argument('--heartbeat', action='store', type=int, default=60, help='Specifies the heartbeat interval (in seconds) for task status messages. Default: %(default)s')
-    parser.add_argument('-v', '--verbose', action='count', default=0, help='Enable verbose output. Repeat for more verbosity.')
+    parser.add_argument('-v', '--verbose', action='count', default=0, help='Enable verbose output. Repeat for more verbosity (-v, -vv, -vvv).')
 
     parser.error = lambda s: fail(s[0].upper() + s[1:])
     args = parser.parse_args()
@@ -1393,7 +1519,10 @@ if __name__ == '__main__':
             try:
                 #ip range(CIDR) e.g. 192.168.1.0/24
                 target_range = ipaddress.ip_network(target, strict=False)
-                live_hosts = detect_live_hosts(target)
+                dlh = detect_live_hosts(target)
+                live_hosts = dlh[0]
+                matched_patterns = dlh[1]
+                Matched_Patterns_Report += matched_patterns
 
                 if live_hosts:
                     for ip in live_hosts:
@@ -1443,9 +1572,15 @@ if __name__ == '__main__':
                 udpports = []
                 for future in as_completed(futures):
                     if future.result():
-                        if future.result()[0]:
+                        
+                        #print(future.result())
+                        data = future.result()[0][0]
+                        matched_patterns = future.result()[0][1]
+                        Matched_Patterns_Report += matched_patterns
 
-                            for host, vals in future.result()[0].items():
+                        if data:
+
+                            for host, vals in data.items():
                                 file.write("### Target {0}\n\n".format(host))
 
                                 for val in vals:
@@ -1483,6 +1618,12 @@ if __name__ == '__main__':
 
         elapsed_time = calculate_elapsed_time(start_time)
         info('{bgreen}Finished scanning all targets in {elapsed_time}!{rst}')
+
+    with open(FinalReportMDFile, 'a') as file:
+        file.write("## Extra Information\n")
+        for match in Matched_Patterns_Report:
+            file.write("\n* {0}".format(match))
+        file.write("\n\n---\n\n")
 
     html(FinalReportMDFile, FinalReportHTMLFile)
 
