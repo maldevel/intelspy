@@ -136,6 +136,9 @@ Scanning single target
 
 ```
 sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ 192.168.10.15
+sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ 192.168.10.15 -v
+sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ 192.168.10.15 -vv
+sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ 192.168.10.15 -vvv
 ```
 
 Scanning a hostname
