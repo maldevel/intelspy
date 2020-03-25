@@ -40,10 +40,30 @@
         command = 'nmap {nmap_extra} -sS -sV --version-all -n -Pn -vv --top-ports 100 --open -T{nmap_speed} -oA "{portsdir}/_nmap_top_100_tcp" {address}'
         pattern = '^(?P<port>\d+)\/(?P<protocol>(tcp|udp))(.*)open(\s*)(?P<service>[\w\-\/\?]+)(\s*)(?P<reason>[\w\-]+)(\s*)ttl(\s*)\d+(\s*)(?P<version>.*)$'
 
-    [quick.nmap-top-25-udp]
+    [quick.nmap-top-20-udp]
 
-        [quick.nmap-top-25-udp.service-detection]
-        command = 'nmap {nmap_extra} -sU -A --version-all -n -Pn -vv --top-ports 25 --open -T{nmap_speed} -oA "{portsdir}/_nmap_top_25_udp" {address}'
+        [quick.nmap-top-20-udp.service-detection]
+        command = 'nmap {nmap_extra} -sU -A --version-all -n -Pn -vv --top-ports 20 --open -T{nmap_speed} -oA "{portsdir}/_nmap_top_20_udp" {address}'
+        pattern = '^(?P<port>\d+)\/(?P<protocol>(tcp|udp))(.*)open(\s*)(?P<service>[\w\-\/\?]+)(\s*)(?P<reason>[\w\-]+)(\s*)ttl(\s*)\d+(\s*)(?P<version>.*)$'
+
+    [quick.nmap-top-1000-tcp]
+
+        [quick.nmap-top-1000-tcp.port-scan]
+        command = 'nmap {nmap_extra} -sS -vv -n -Pn --top-ports 1000 --open -T{nmap_speed} -oA "{portsdir}/_nmap_top_1000_tcp" {address}'
+        pattern = '^(?P<port>\d+)\/(?P<protocol>(tcp|udp))(.*)open(\s*)(?P<service>[\w\-\/\?]+)(\s*)(?P<reason>[\w\-]+)(\s*)ttl(\s*)\d+(\s*)(?P<version>.*)$'
+
+        [quick.nmap-top-1000-tcp.service-detection]
+        command = 'nmap {nmap_extra} -sS -vv -A -Pn --osscan-guess --version-all -p{ports} -T{nmap_speed} -oA "{portsdir}/_nmap_top_1000_tcp_services" {address}'
+        pattern = '^(?P<port>\d+)\/(?P<protocol>(tcp|udp))(.*)open(\s*)(?P<service>[\w\-\/\?]+)(\s*)(?P<reason>[\w\-]+)(\s*)ttl(\s*)\d+(\s*)(?P<version>.*)$'
+
+    [quick.nmap-top-100-udp]
+
+        [quick.nmap-top-100-udp.port-scan]
+        command = 'nmap {nmap_extra} -sU -vv -n -Pn --top-ports 100 --open -T{nmap_speed} -oA "{portsdir}/_nmap_top_100_udp" {address}'
+        pattern = '^(?P<port>\d+)\/(?P<protocol>(tcp|udp))(.*)open(\s*)(?P<service>[\w\-\/\?]+)(\s*)(?P<reason>[\w\-]+)(\s*)ttl(\s*)\d+(\s*)(?P<version>.*)$'
+
+        [quick.nmap-top-100-udp.service-detection]
+        command = 'nmap {nmap_extra} -sS -vv -A -Pn --osscan-guess --version-all -p{ports} -T{nmap_speed} -oA "{portsdir}/_nmap_top_100_udp_services" {address}'
         pattern = '^(?P<port>\d+)\/(?P<protocol>(tcp|udp))(.*)open(\s*)(?P<service>[\w\-\/\?]+)(\s*)(?P<reason>[\w\-]+)(\s*)ttl(\s*)\d+(\s*)(?P<version>.*)$'
 
 [extreme]
