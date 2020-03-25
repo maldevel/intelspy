@@ -37,16 +37,6 @@ I had started working on IntelSpy when one day I discovered [AutoRecon](https://
 * colorama
 * toml (https://github.com/toml-lang/toml)
 * seclists
-
-```
-pip3 install -r requirements.txt
-sudo apt install seclists
-```
-
----
-
-### Additional Tools
-
 * curl
 * enum4linux
 * gobuster
@@ -65,6 +55,16 @@ sudo apt install seclists
 * whatweb
 * wkhtmltoimage
 * pandoc
+* hydra
+* medusa
+* wpscan
+* ldapsearch
+* patator
+
+```
+pip3 install -r requirements.txt
+sudo apt install seclists
+```
 
 ---
 
@@ -78,13 +78,12 @@ sudo apt install seclists
                                 
 IntelSpy v1.0 - Perform automated network reconnaissance scans to gather network intelligence.
 IntelSpy is an open source tool licensed under GPLv3.
-Written by: @maldevel | Logisek
-https://pentest-labs.com/
+Written by: @maldevel | @LOGISEK_LTD
+https://logisek.com | https://pentest-labs.com
 https://github.com/maldevel/intelspy
 
 
 usage: intelspy.py [-h] [-ts TARGET_FILE] -p PROJECT_NAME -w WORKING_DIR
-                   [--analyze <datetime>]
                    [--exclude <host1[,host2][,host3],...>] [-s SPEED]
                    [-ct <number>] [-cs <number>] [--profile PROFILE_NAME]
                    [--livehost-profile LIVEHOST_PROFILE_NAME]
@@ -104,7 +103,6 @@ optional arguments:
                         project name
   -w WORKING_DIR, --working-dir WORKING_DIR
                         working directory
-  --analyze <datetime>  analyze results, no scan (e.g. 2020-03-14_18-07-32)
   --exclude <host1[,host2][,host3],...>
                         exclude hosts/networks
   -s SPEED, --speed SPEED
@@ -125,7 +123,9 @@ optional arguments:
   --heartbeat HEARTBEAT
                         Specifies the heartbeat interval (in seconds) for task
                         status messages. Default: 60
-  -v, --verbose         Enable verbose output. Repeat for more verbosity.
+  -v, --verbose         Enable verbose output. Repeat for more verbosity (-v,
+                        -vv, -vvv).
+
 ```
 
 ---
@@ -172,12 +172,6 @@ Excluding many hosts
 
 ```
 sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ --exclude 192.168.10.9,192.168.10.24 192.168.10.0/24
-```
-
-Analyze previous results (Do not scan).
-
-```
-sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ --analyze 2020-03-14_18-07-32 192.168.10.0/24
 ```
 
 ---
