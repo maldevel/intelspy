@@ -391,6 +391,14 @@ async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
         address = target.address
         reportdir = target.reportdir
         scandir = target.scansdir
+        portsdir = target.portsdir
+        servicesdir = target.servicesdir
+        screenshotsdir = target.screenshotsdir
+        nmapdir = target.nmapdir
+        niktodir = target.niktodir
+        dirscandir = target.dirscandir
+        crackingdir = target.crackingdir
+        webdir = target.webdir
 
         info('Running task {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{cmd}{rst}' if verbose >= 2 else ''))
 
@@ -409,11 +417,6 @@ async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
             read_stream(process.stdout, target, tag=tag, patterns=patterns),
             read_stream(process.stderr, target, tag=tag, patterns=patterns, color=Fore.RED)
         ]
-
-        # await asyncio.wait([
-        #     read_stream(process.stdout, target, tag=tag, patterns=patterns),
-        #     read_stream(process.stderr, target, tag=tag, patterns=patterns, color=Fore.RED)
-        # ])
 
         results = await asyncio.gather(*output)
 
@@ -616,6 +619,14 @@ async def run_livehostscan(semaphore, tag, target, live_host_detection):
         scandir = target.scansdir
         nmap_speed = target.speed
         nmap_extra = nmap
+        portsdir = target.portsdir
+        servicesdir = target.servicesdir
+        screenshotsdir = target.screenshotsdir
+        nmapdir = target.nmapdir
+        niktodir = target.niktodir
+        dirscandir = target.dirscandir
+        crackingdir = target.crackingdir
+        webdir = target.webdir
 
         command = e(live_host_detection[0])
         pattern = live_host_detection[1]
@@ -672,6 +683,14 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
         scandir = target.scansdir
         nmap_speed = target.speed
         nmap_extra = nmap
+        portsdir = target.portsdir
+        servicesdir = target.servicesdir
+        screenshotsdir = target.screenshotsdir
+        nmapdir = target.nmapdir
+        niktodir = target.niktodir
+        dirscandir = target.dirscandir
+        crackingdir = target.crackingdir
+        webdir = target.webdir
 
         ports = ''
         if port_scan is not None:
@@ -796,6 +815,14 @@ async def ping_and_scan(loop, semaphore, target):
     reportdir = target.reportdir
     scandir = target.scansdir
     pending = []
+    portsdir = target.portsdir
+    servicesdir = target.servicesdir
+    screenshotsdir = target.screenshotsdir
+    nmapdir = target.nmapdir
+    niktodir = target.niktodir
+    dirscandir = target.dirscandir
+    crackingdir = target.crackingdir
+    webdir = target.webdir
 
     heartbeat = loop.create_task(start_heartbeat(target, period=heartbeat_interval))
 
@@ -851,6 +878,14 @@ async def scan_services(loop, semaphore, target):
     nmap_speed = target.speed
     nmap_extra = nmap
     pending = []
+    portsdir = target.portsdir
+    servicesdir = target.servicesdir
+    screenshotsdir = target.screenshotsdir
+    nmapdir = target.nmapdir
+    niktodir = target.niktodir
+    dirscandir = target.dirscandir
+    crackingdir = target.crackingdir
+    webdir = target.webdir
 
     heartbeat = loop.create_task(start_heartbeat(target, period=heartbeat_interval))
 
@@ -1071,11 +1106,44 @@ def scan_host(target, concurrent_scans):
 
     scandir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'scans')
     target.scansdir = scandir
+
     reportdir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'report')
     target.reportdir = reportdir
 
+    portsdir = os.path.join(scandir, 'ports')
+    target.portsdir = portsdir
+
+    servicesdir = os.path.join(scandir, 'services')
+    target.servicesdir = servicesdir
+
+    screenshotsdir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'screenshots')
+    target.screenshotsdir = screenshotsdir
+
+    nmapdir = os.path.join(servicesdir, 'nmap')
+    target.nmapdir = nmapdir
+
+    niktodir = os.path.join(servicesdir, 'nikto')
+    target.niktodir = niktodir
+
+    dirscandir = os.path.join(servicesdir, 'dirscan')
+    target.dirscandir = dirscandir
+
+    crackingdir = os.path.join(servicesdir, 'cracking')
+    target.crackingdir = crackingdir
+
+    webdir = os.path.join(servicesdir, 'web')
+    target.webdir = webdir
+
     Path(scandir).mkdir(parents=True, exist_ok=True)
     Path(reportdir).mkdir(parents=True, exist_ok=True)
+    Path(portsdir).mkdir(parents=True, exist_ok=True)
+    Path(servicesdir).mkdir(parents=True, exist_ok=True)
+    Path(screenshotsdir).mkdir(parents=True, exist_ok=True)
+    Path(nmapdir).mkdir(parents=True, exist_ok=True)
+    Path(niktodir).mkdir(parents=True, exist_ok=True)
+    Path(dirscandir).mkdir(parents=True, exist_ok=True)
+    Path(crackingdir).mkdir(parents=True, exist_ok=True)
+    Path(webdir).mkdir(parents=True, exist_ok=True)
 
     # Use a lock when writing to specific files that may be written to by other asynchronous functions.
     target.lock = asyncio.Lock()
@@ -1102,10 +1170,17 @@ def scan_host(target, concurrent_scans):
 class Target:
     def __init__(self, address):
         self.address = address
-        #self.basedir = ''
+        self.screenshotsdir = ''
         self.reportdir = ''
+        self.nmapdir = ''
+        self.niktodir = ''
+        self.dirscandir = ''
+        self.crackingdir = ''
+        self.webdir = ''
         self.speed = speed
         self.scansdir = ''
+        self.portsdir = ''
+        self.servicesdir = ''
         self.scans = []
         self.lock = None
         self.running_tasks = []
