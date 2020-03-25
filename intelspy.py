@@ -122,6 +122,7 @@ DatabaseFile = ''
 FinalReportMDFile = ''
 FinalReportHTMLFile = ''
 CommandsFile = ''
+ManualCommandsFile = ''
 
 CurrentDateTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 DbConnection = None
@@ -925,6 +926,7 @@ async def scan_services(loop, semaphore, target):
                             matched_patterns.append(pattern)
 
                 if result['name'] == 'run_portscan':
+
                     for pattern in result['ports_patterns']:
                         if pattern not in matched_patterns:
                             matched_patterns.append(pattern)
@@ -991,6 +993,7 @@ async def scan_services(loop, semaphore, target):
 
                             if 'manual' in service_scans_config[service_scan]:
                                 heading = False
+
                                 with open(os.path.join(reportdir, '_manual_commands.log'), 'a') as file:
                                     for manual in service_scans_config[service_scan]['manual']:
                                         if 'description' in manual:
@@ -1006,6 +1009,49 @@ async def scan_services(loop, semaphore, target):
                                             for manual_command in manual['commands']:
                                                 manual_command = e(manual_command)
                                                 file.writelines('\t\t' + e('{manual_command}\n\n'))
+                                    if heading:
+                                        file.writelines('\n')
+
+                                shellscript = os.path.join(reportdir, '_manual_commands.sh')
+                                exists = os.path.isfile(shellscript)
+
+                                with open(shellscript, 'a') as file:
+                                    if not exists:
+                                        file.writelines('#!/bin/bash\n\n')
+
+                                    for manual in service_scans_config[service_scan]['manual']:
+                                        if 'description' in manual:
+                                            if not heading:
+                                                file.writelines(e('# [*] {service} on {protocol}/{port}\n\n'))
+                                                heading = True
+                                            description = manual['description']
+                                            file.writelines(e('#\t[-] {description}\n\n'))
+                                        if 'commands' in manual:
+                                            if not heading:
+                                                file.writelines(e('# [*] {service} on {protocol}/{port}\n\n'))
+                                                heading = True
+                                            for manual_command in manual['commands']:
+                                                manual_command = e(manual_command)
+                                                file.writelines(e('{manual_command}\n\n'))
+                                    if heading:
+                                        file.writelines('\n')
+
+                                with open(ManualCommandsFile, 'a') as file:
+
+                                    for manual in service_scans_config[service_scan]['manual']:
+                                        if 'description' in manual:
+                                            if not heading:
+                                                file.writelines(e('# [*] {service} on {protocol}/{port}\n\n'))
+                                                heading = True
+                                            description = manual['description']
+                                            file.writelines(e('#\t[-] {description}\n\n'))
+                                        if 'commands' in manual:
+                                            if not heading:
+                                                file.writelines(e('# [*] {service} on {protocol}/{port}\n\n'))
+                                                heading = True
+                                            for manual_command in manual['commands']:
+                                                manual_command = e(manual_command)
+                                                file.writelines(e('{manual_command}\n\n'))
                                     if heading:
                                         file.writelines('\n')
 
@@ -1199,7 +1245,7 @@ def isRoot():
 #####################################################################################################################
 def createProjectDirStructure(projName, workingDir):
         global ProjectDir, CommandsDir, DatabaseDir, LogsDir, ReportDir, TargetsDir, LogsFile
-        global DatabaseFile, FinalReportMDFile, FinalReportHTMLFile, CommandsFile
+        global DatabaseFile, FinalReportMDFile, FinalReportHTMLFile, CommandsFile, ManualCommandsFile
 
         ProjectDir = os.path.join(workingDir, projName)
         CommandsDir = os.path.join(ProjectDir, 'commands', CurrentDateTime)
@@ -1213,12 +1259,17 @@ def createProjectDirStructure(projName, workingDir):
         FinalReportMDFile = os.path.join(ReportDir, "final-report.md")
         FinalReportHTMLFile = FinalReportMDFile.replace('.md', '.html')
         CommandsFile = os.path.join(CommandsDir, "_commands.log")
+        ManualCommandsFile = os.path.join(CommandsDir, "_manual_commands.log")
 
         Path(CommandsDir).mkdir(parents=True, exist_ok=True)
         Path(DatabaseDir).mkdir(parents=True, exist_ok=True)
         Path(LogsDir).mkdir(parents=True, exist_ok=True)
         Path(ReportDir).mkdir(parents=True, exist_ok=True)
         Path(TargetsDir).mkdir(parents=True, exist_ok=True)
+
+        with open(ManualCommandsFile, 'w') as file:
+            file.writelines('#!/bin/bash\n\n')
+            
         info('Creating project directory structure \'{byellow}{ProjectDir}{rst}\'.')
 
 
