@@ -546,7 +546,7 @@ async def parse_live_host_detection(stream, tag, target, pattern):
                             with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
                                 log_line = e('{tag} - {host} - {match}\n\n')
                                 file.writelines(log_line)
-                                mp = e('{host} - ' + p['description'] + '\n\n').strip()
+                                mp = e('{host}\n\n').strip()
                                 if mp not in matched_patterns:
                                     matched_patterns.append(mp)
                                     
