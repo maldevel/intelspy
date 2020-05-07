@@ -27,9 +27,9 @@
 # Created by @maldevel | @LOGISEK_LTD
 # https://logisek.com
 # https://pentest-labs.com
-# intelspy.py Version 1.0
+# intelspy.py Version 1.1
 # Released under GPL Version 3 License
-# March 2020
+# 2020-
 
 
 import atexit
@@ -58,7 +58,7 @@ from random import randrange
 
 
 #####################################################################################################################
-__version__ = 1.0
+__version__ = 1.1
 
 
 
@@ -314,6 +314,7 @@ if 'password_wordlist' in service_scans_config:
 async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
     matched_patterns = []
     address = target.address
+    addressname = target.addressname
 
     while True:
         line = await stream.readline()
@@ -329,7 +330,7 @@ async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
+                            with open(os.path.join(target.reportsdir, target.address.replace('/', '_') + '_extra-information.txt'), 'a') as file:
                                 log_line = e('{tag} - {target.address} - ' + p['description'] + '\n\n')
                                 file.writelines(log_line)
                                 mp = e('{target.address} - ' + p['description'] + '\n\n').strip()
@@ -343,7 +344,7 @@ async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta} {bblue}{match}{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
+                            with open(os.path.join(target.reportsdir, target.address.replace('/', '_') + '_extra-information.txt'), 'a') as file:
                                 log_line = e('{tag} - {target.address} - {match}\n\n')
                                 file.writelines(log_line)
                                 mp = e('{target.address}\n\n').strip()
@@ -359,7 +360,7 @@ async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
+                            with open(os.path.join(target.reportsdir, target.address.replace('/', '_') + '_extra-information.txt'), 'a') as file:
                                 log_line = e('{tag} - {target.address} - ' + p['description'] + '\n\n')
                                 file.writelines(log_line)
                                 mp = e('{target.address} - ' + p['description'] + '\n\n').strip()
@@ -372,7 +373,7 @@ async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta} {bblue}{match}{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
+                            with open(os.path.join(target.reportsdir, target.address.replace('/', '_') + '_extra-information.txt'), 'a') as file:
                                 log_line = e('{tag} - {target.address} - {match}\n\n')
                                 file.writelines(log_line)
                                 imp = e('{target.address} - ' + p['description'] + '\n\n').strip()
@@ -390,9 +391,11 @@ async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
     async with semaphore:
         matched_patterns = []
         address = target.address
-        reportdir = target.reportdir
+        addressname = target.addressname
+        reportsdir = target.reportsdir
         scandir = target.scansdir
-        portsdir = target.portsdir
+        tcpportsdir = target.tcpportsdir
+        udpportsdir = target.udpportsdir
         servicesdir = target.servicesdir
         screenshotsdir = target.screenshotsdir
         nmapdir = target.nmapdir
@@ -404,7 +407,7 @@ async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
         info('Running task {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{cmd}{rst}' if verbose >= 2 else ''))
 
         async with target.lock:
-            with open(os.path.join(reportdir, '_commands.log'), 'a') as file:
+            with open(os.path.join(reportsdir, target.address.replace('/', '_') + '_commands.log'), 'a') as file:
                 file.writelines(e('{cmd}\n\n'))
             with open(CommandsFile, 'a') as file:
                 file.writelines(e('{cmd}\n\n'))
@@ -431,7 +434,7 @@ async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
         error('Task {bred}{tag}{rst} on {byellow}{address}{rst} returned non-zero exit code: {process.returncode}')
 
         async with target.lock:
-            with open(os.path.join(reportdir, '_errors.log'), 'a') as file:
+            with open(os.path.join(reportsdir, target.address.replace('/', '_') + '_errors.log'), 'a') as file:
                 ts = datetime.now().strftime("%d/%b/%Y:%H:%M:%S")
                 tz = datetime.now(timezone.utc).astimezone().strftime('%z')
                 hostname = socket.gethostname()
@@ -454,6 +457,7 @@ async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
 async def parse_port_scan(stream, tag, target, pattern):
     matched_patterns = []
     address = target.address
+    addressname = target.addressname
     ports = []
 
     while True:
@@ -475,7 +479,7 @@ async def parse_port_scan(stream, tag, target, pattern):
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
+                            with open(os.path.join(target.reportsdir, target.address.replace('/', '_') + '_extra-information.txt'), 'a') as file:
                                 log_line = e('{tag} - {target.address} - ' + p['description'] + '\n\n')
                                 file.writelines(log_line)
                                 mp = e('{target.address} - ' + p['description'] + '\n\n').strip()
@@ -488,7 +492,7 @@ async def parse_port_scan(stream, tag, target, pattern):
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta} {bblue}{match}{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
+                            with open(os.path.join(target.reportsdir, target.address.replace('/', '_') + '_extra-information.txt'), 'a') as file:
                                 log_line = e('{tag} - {target.address} - {match}\n\n')
                                 file.writelines(log_line)
                                 mp = e('{target.address} - ' + p['description'] + '\n\n').strip()
@@ -507,6 +511,7 @@ async def parse_port_scan(stream, tag, target, pattern):
 async def parse_live_host_detection(stream, tag, target, pattern):
     matched_patterns = []
     address = target.address
+    addressname = target.addressname
     host = ''
     livehosts = []
 
@@ -530,7 +535,7 @@ async def parse_live_host_detection(stream, tag, target, pattern):
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{host}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
+                            with open(os.path.join(target.reportsdir, target.address.replace('/', '_') + '_extra-information.txt'), 'a') as file:
                                 log_line = e('{tag} - {host} - ' + p['description'] + '\n\n')
                                 file.writelines(log_line)
                                 mp = e('{host} - ' + p['description'] + '\n\n').strip()
@@ -543,7 +548,7 @@ async def parse_live_host_detection(stream, tag, target, pattern):
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{host}{rst} - {bmagenta} {bblue}{match}{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
+                            with open(os.path.join(target.reportsdir, target.address.replace('/', '_') + '_extra-information.txt'), 'a') as file:
                                 log_line = e('{tag} - {host} - {match}\n\n')
                                 file.writelines(log_line)
                                 mp = e('{host}\n\n').strip()
@@ -562,6 +567,7 @@ async def parse_live_host_detection(stream, tag, target, pattern):
 async def parse_service_detection(stream, tag, target, pattern):
     matched_patterns = []
     address = target.address
+    addressname = target.addressname
     services = []
 
     while True:
@@ -582,7 +588,7 @@ async def parse_service_detection(stream, tag, target, pattern):
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta}' + p['description'].replace('{match}', '{bblue}{match}{crst}{bmagenta}') + '{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
+                            with open(os.path.join(target.reportsdir, target.address.replace('/', '_') + '_extra-information.txt'), 'a') as file:
                                 log_line = e('{tag} - {target.address} - ' + p['description'] + '\n\n')
                                 file.writelines(log_line)
                                 mp = e('{target.address} - ' + p['description'] + '\n\n').strip()
@@ -596,7 +602,7 @@ async def parse_service_detection(stream, tag, target, pattern):
                         if verbose >= 1:
                             info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} - {bmagenta} {bblue}{match}{rst}')
                         async with target.lock:
-                            with open(os.path.join(target.reportdir, '_extra-information.txt'), 'a') as file:
+                            with open(os.path.join(target.reportsdir, target.address.replace('/', '_') + '_extra-information.txt'), 'a') as file:
                                 log_line = e('{tag} - {target.address} - {match}\n\n')
                                 file.writelines(log_line)
                                 mp = e('{target.address}\n\n').strip()
@@ -616,11 +622,13 @@ async def run_livehostscan(semaphore, tag, target, live_host_detection):
     async with semaphore:
 
         address = target.address
-        reportdir = target.reportdir
+        addressname = target.addressname
+        reportsdir = target.reportsdir
         scandir = target.scansdir
         nmap_speed = target.speed
         nmap_extra = nmap
-        portsdir = target.portsdir
+        tcpportsdir = target.tcpportsdir
+        udpportsdir = target.udpportsdir
         servicesdir = target.servicesdir
         screenshotsdir = target.screenshotsdir
         nmapdir = target.nmapdir
@@ -635,7 +643,7 @@ async def run_livehostscan(semaphore, tag, target, live_host_detection):
         info('Running live hosts detection {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{command}{rst}' if verbose >= 2 else ''))
 
         async with target.lock:
-            with open(os.path.join(reportdir, '_commands.log'), 'a') as file:
+            with open(os.path.join(reportsdir, target.address.replace('/', '_') + '_commands.log'), 'a') as file:
                 file.writelines(e('{command}\n\n'))
             with open(CommandsFile, 'a') as file:
                 file.writelines(e('{command}\n\n'))
@@ -661,7 +669,7 @@ async def run_livehostscan(semaphore, tag, target, live_host_detection):
         if process.returncode != 0:
             error('Live hosts detection {bred}{tag}{rst} on {byellow}{address}{rst} returned non-zero exit code: {process.returncode}')
             async with target.lock:
-                with open(os.path.join(reportdir, '_errors.log'), 'a') as file:
+                with open(os.path.join(reportsdir, target.address.replace('/', '_') + '_errors.log'), 'a') as file:
                     file.writelines(e('[*] Live host detection {tag} returned non-zero exit code: {process.returncode}. Command: {command}\n'))
         else:
             info('Live hosts detection {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
@@ -680,11 +688,13 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
         ports_matched_patterns = []
         services_matched_patterns = []
         address = target.address
-        reportdir = target.reportdir
+        addressname = target.addressname
+        reportsdir = target.reportsdir
         scandir = target.scansdir
         nmap_speed = target.speed
         nmap_extra = nmap
-        portsdir = target.portsdir
+        tcpportsdir = target.tcpportsdir
+        udpportsdir = target.udpportsdir
         servicesdir = target.servicesdir
         screenshotsdir = target.screenshotsdir
         nmapdir = target.nmapdir
@@ -701,7 +711,7 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
             info('Running port scan {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{command}{rst}' if verbose >= 2 else ''))
 
             async with target.lock:
-                with open(os.path.join(reportdir, '_commands.log'), 'a') as file:
+                with open(os.path.join(reportsdir, target.address.replace('/', '_') + '_commands.log'), 'a') as file:
                     file.writelines(e('{command}\n\n'))
                 with open(CommandsFile, 'a') as file:
                     file.writelines(e('{command}\n\n'))
@@ -727,7 +737,7 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
             if process.returncode != 0:
                 error('Port scan {bred}{tag}{rst} on {byellow}{address}{rst} returned non-zero exit code: {process.returncode}')
                 async with target.lock:
-                    with open(os.path.join(reportdir, '_errors.log'), 'a') as file:
+                    with open(os.path.join(reportsdir, target.address.replace('/', '_') + '_errors.log'), 'a') as file:
                         file.writelines(e('[*] Port scan {tag} returned non-zero exit code: {process.returncode}. Command: {command}\n'))
                 return {'returncode': process.returncode}
             else:
@@ -750,7 +760,7 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
         info('Running service detection {bgreen}{tag}{rst} on {byellow}{address}{rst}' + (' with {bblue}{command}{rst}' if verbose >= 2 else ''))
 
         async with target.lock:
-            with open(os.path.join(reportdir, '_commands.log'), 'a') as file:
+            with open(os.path.join(reportsdir, target.address.replace('/', '_') + '_commands.log'), 'a') as file:
                 file.writelines(e('{command}\n\n'))
             with open(CommandsFile, 'a') as file:
                 file.writelines(e('{command}\n\n'))
@@ -775,7 +785,7 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
         if process.returncode != 0:
             error('Service detection {bred}{tag}{rst} on {byellow}{address}{rst} returned non-zero exit code: {process.returncode}')
             async with target.lock:
-                with open(os.path.join(reportdir, '_errors.log'), 'a') as file:
+                with open(os.path.join(reportsdir, target.address.replace('/', '_') + '_errors.log'), 'a') as file:
                     file.writelines(e('[*] Service detection {tag} returned non-zero exit code: {process.returncode}. Command: {command}\n'))
         else:
             info('Service detection {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
@@ -813,10 +823,12 @@ async def start_heartbeat(target, period=60):
 #####################################################################################################################
 async def ping_and_scan(loop, semaphore, target):
     address = target.address
-    reportdir = target.reportdir
+    addressname = target.addressname
+    reportsdir = target.reportsdir
     scandir = target.scansdir
     pending = []
-    portsdir = target.portsdir
+    tcpportsdir = target.tcpportsdir
+    udpportsdir = target.udpportsdir
     servicesdir = target.servicesdir
     screenshotsdir = target.screenshotsdir
     nmapdir = target.nmapdir
@@ -860,7 +872,7 @@ async def ping_and_scan(loop, semaphore, target):
 
                         info('Found live host {bmagenta}{livehost}{rst} on target {byellow}{address}{rst}')
 
-                        with open(os.path.join(reportdir, '_notes.txt'), 'a') as file:
+                        with open(os.path.join(reportsdir, target.address.replace('/', '_') + '_notes.txt'), 'a') as file:
                             file.writelines(e('[*] Live host {livehost} found on target {address}.\n\n'))
 
                     for pattern in result['patterns']:
@@ -874,12 +886,14 @@ async def ping_and_scan(loop, semaphore, target):
 #####################################################################################################################
 async def scan_services(loop, semaphore, target):
     address = target.address
-    reportdir = target.reportdir
+    addressname = target.addressname
+    reportsdir = target.reportsdir
     scandir = target.scansdir
     nmap_speed = target.speed
     nmap_extra = nmap
     pending = []
-    portsdir = target.portsdir
+    tcpportsdir = target.tcpportsdir
+    udpportsdir = target.udpportsdir
     servicesdir = target.servicesdir
     screenshotsdir = target.screenshotsdir
     nmapdir = target.nmapdir
@@ -949,7 +963,7 @@ async def scan_services(loop, semaphore, target):
 
                         info('Found {bmagenta}{service}{rst} ({bmagenta}{version}{rst}) on {bmagenta}{protocol}/{port}{rst} on target {byellow}{address}{rst}')
 
-                        with open(os.path.join(reportdir, '_notes.txt'), 'a') as file:
+                        with open(os.path.join(reportsdir, target.address.replace('/', '_') + '_notes.txt'), 'a') as file:
                             file.writelines(e('[*] {service} found on {protocol}/{port}.\n\n'))
 
                         if protocol == 'udp':
@@ -994,7 +1008,7 @@ async def scan_services(loop, semaphore, target):
                             if 'manual' in service_scans_config[service_scan]:
                                 heading = False
 
-                                with open(os.path.join(reportdir, '_manual_commands.log'), 'a') as file:
+                                with open(os.path.join(reportsdir, target.address.replace('/', '_') + '_manual_commands.txt'), 'a') as file:
                                     for manual in service_scans_config[service_scan]['manual']:
                                         if 'description' in manual:
                                             if not heading:
@@ -1012,7 +1026,7 @@ async def scan_services(loop, semaphore, target):
                                     if heading:
                                         file.writelines('\n')
 
-                                shellscript = os.path.join(reportdir, '_manual_commands.sh')
+                                shellscript = os.path.join(reportsdir, target.address.replace('/', '_') + '_manual_commands.sh')
                                 exists = os.path.isfile(shellscript)
 
                                 with open(shellscript, 'a') as file:
@@ -1117,13 +1131,14 @@ def scan_live_hosts(target, concurrent_scans):
     start_time = time.time()
     info('Scanning target {byellow}{target.address}{rst} for live hosts')
 
-    livehostsdir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'scans', 'live-hosts')
+    livehostsdir = os.path.join(TargetsDir, 'scans', 'live-hosts')
     target.scansdir = livehostsdir
-    reportdir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'report')
-    target.reportdir = reportdir
+    
+    reportsdir = os.path.join(TargetsDir, 'reports')
+    target.reportsdir = reportsdir
 
     Path(livehostsdir).mkdir(parents=True, exist_ok=True)
-    Path(reportdir).mkdir(parents=True, exist_ok=True)
+    Path(reportsdir).mkdir(parents=True, exist_ok=True)
 
     # Use a lock when writing to specific files that may be written to by other asynchronous functions.
     target.lock = asyncio.Lock()
@@ -1150,19 +1165,22 @@ def scan_host(target, concurrent_scans):
     start_time = time.time()
     info('Scanning target {byellow}{target.address}{rst}')
 
-    scandir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'scans')
+    scandir = os.path.join(TargetsDir, 'scans')
     target.scansdir = scandir
 
-    reportdir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'report')
-    target.reportdir = reportdir
+    reportsdir = os.path.join(TargetsDir, 'reports')
+    target.reportsdir = reportsdir
 
-    portsdir = os.path.join(scandir, 'ports')
-    target.portsdir = portsdir
+    tcpportsdir = os.path.join(scandir, 'ports', 'tcp')
+    target.tcpportsdir = tcpportsdir
+
+    udpportsdir = os.path.join(scandir, 'ports', 'udp')
+    target.udpportsdir = udpportsdir
 
     servicesdir = os.path.join(scandir, 'services')
     target.servicesdir = servicesdir
 
-    screenshotsdir = os.path.join(TargetsDir, target.address.replace('/', '_'), 'screenshots')
+    screenshotsdir = os.path.join(TargetsDir, 'screenshots')
     target.screenshotsdir = screenshotsdir
 
     nmapdir = os.path.join(servicesdir, 'nmap')
@@ -1181,8 +1199,9 @@ def scan_host(target, concurrent_scans):
     target.webdir = webdir
 
     Path(scandir).mkdir(parents=True, exist_ok=True)
-    Path(reportdir).mkdir(parents=True, exist_ok=True)
-    Path(portsdir).mkdir(parents=True, exist_ok=True)
+    Path(reportsdir).mkdir(parents=True, exist_ok=True)
+    Path(tcpportsdir).mkdir(parents=True, exist_ok=True)
+    Path(udpportsdir).mkdir(parents=True, exist_ok=True)
     Path(servicesdir).mkdir(parents=True, exist_ok=True)
     Path(screenshotsdir).mkdir(parents=True, exist_ok=True)
     Path(nmapdir).mkdir(parents=True, exist_ok=True)
@@ -1216,8 +1235,9 @@ def scan_host(target, concurrent_scans):
 class Target:
     def __init__(self, address):
         self.address = address
+        self.addressname = address.replace('/', '_')
         self.screenshotsdir = ''
-        self.reportdir = ''
+        self.reportsdir = ''
         self.nmapdir = ''
         self.niktodir = ''
         self.dirscandir = ''
@@ -1225,7 +1245,8 @@ class Target:
         self.webdir = ''
         self.speed = speed
         self.scansdir = ''
-        self.portsdir = ''
+        self.tcpportsdir = ''
+        self.udpportsdir = ''
         self.servicesdir = ''
         self.scans = []
         self.lock = None
@@ -1254,12 +1275,12 @@ def createProjectDirStructure(projName, workingDir):
         ReportDir = os.path.join(ProjectDir, 'report', CurrentDateTime)
         TargetsDir = os.path.join(ProjectDir, 'targets', CurrentDateTime)
 
-        LogsFile = os.path.join(LogsDir, "_logs.txt")
-        DatabaseFile = os.path.join(DatabaseDir, "_database.db")
+        LogsFile = os.path.join(LogsDir, "logs.txt")
+        DatabaseFile = os.path.join(DatabaseDir, "database.db")
         FinalReportMDFile = os.path.join(ReportDir, "final-report.md")
         FinalReportHTMLFile = FinalReportMDFile.replace('.md', '.html')
-        CommandsFile = os.path.join(CommandsDir, "_commands.log")
-        ManualCommandsFile = os.path.join(CommandsDir, "_manual_commands.log")
+        CommandsFile = os.path.join(CommandsDir, "commands.log")
+        ManualCommandsFile = os.path.join(CommandsDir, "manual_commands.sh")
 
         Path(CommandsDir).mkdir(parents=True, exist_ok=True)
         Path(DatabaseDir).mkdir(parents=True, exist_ok=True)
