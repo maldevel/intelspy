@@ -27,7 +27,7 @@
 # Created by @maldevel | @LOGISEK_LTD
 # https://logisek.com
 # https://pentest-labs.com
-# intelspy.py Version 1.1
+# intelspy.py
 # Released under GPL Version 3 License
 # 2020-
 
@@ -58,11 +58,12 @@ from random import randrange
 
 
 #####################################################################################################################
-__version__ = 1.1
 
+__version__ = 1.2
 
 
 #####################################################################################################################
+
 message = """
  ___               __        
   |  ._ _|_  _  | (_  ._     
@@ -395,10 +396,15 @@ async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
         reportsdir = target.reportsdir
         scandir = target.scansdir
         tcpportsdir = target.tcpportsdir
+        fulltcpportsdir = target.fulltcpportsdir
+        toptcpportsdir = target.toptcpportsdir
         udpportsdir = target.udpportsdir
+        fulludpportsdir = target.fulludpportsdir
+        topudpportsdir = target.topudpportsdir
         servicesdir = target.servicesdir
         screenshotsdir = target.screenshotsdir
-        nmapdir = target.nmapdir
+        tcpservicesdir = target.tcpservicesdir
+        udpservicesdir = target.udpservicesdir
         niktodir = target.niktodir
         dirscandir = target.dirscandir
         crackingdir = target.crackingdir
@@ -628,10 +634,15 @@ async def run_livehostscan(semaphore, tag, target, live_host_detection):
         nmap_speed = target.speed
         nmap_extra = nmap
         tcpportsdir = target.tcpportsdir
+        fulltcpportsdir = target.fulltcpportsdir
+        toptcpportsdir = target.toptcpportsdir
         udpportsdir = target.udpportsdir
+        fulludpportsdir = target.fulludpportsdir
+        topudpportsdir = target.topudpportsdir
         servicesdir = target.servicesdir
         screenshotsdir = target.screenshotsdir
-        nmapdir = target.nmapdir
+        tcpservicesdir = target.tcpservicesdir
+        udpservicesdir = target.udpservicesdir
         niktodir = target.niktodir
         dirscandir = target.dirscandir
         crackingdir = target.crackingdir
@@ -694,10 +705,15 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
         nmap_speed = target.speed
         nmap_extra = nmap
         tcpportsdir = target.tcpportsdir
+        fulltcpportsdir = target.fulltcpportsdir
+        toptcpportsdir = target.toptcpportsdir
         udpportsdir = target.udpportsdir
+        fulludpportsdir = target.fulludpportsdir
+        topudpportsdir = target.topudpportsdir
         servicesdir = target.servicesdir
         screenshotsdir = target.screenshotsdir
-        nmapdir = target.nmapdir
+        tcpservicesdir = target.tcpservicesdir
+        udpservicesdir = target.udpservicesdir
         niktodir = target.niktodir
         dirscandir = target.dirscandir
         crackingdir = target.crackingdir
@@ -828,10 +844,15 @@ async def ping_and_scan(loop, semaphore, target):
     scandir = target.scansdir
     pending = []
     tcpportsdir = target.tcpportsdir
+    fulltcpportsdir = target.fulltcpportsdir
+    toptcpportsdir = target.toptcpportsdir
     udpportsdir = target.udpportsdir
+    fulludpportsdir = target.fulludpportsdir
+    topudpportsdir = target.topudpportsdir
     servicesdir = target.servicesdir
     screenshotsdir = target.screenshotsdir
-    nmapdir = target.nmapdir
+    tcpservicesdir = target.tcpservicesdir
+    udpservicesdir = target.udpservicesdir
     niktodir = target.niktodir
     dirscandir = target.dirscandir
     crackingdir = target.crackingdir
@@ -893,10 +914,15 @@ async def scan_services(loop, semaphore, target):
     nmap_extra = nmap
     pending = []
     tcpportsdir = target.tcpportsdir
+    fulltcpportsdir = target.fulltcpportsdir
+    toptcpportsdir = target.toptcpportsdir
     udpportsdir = target.udpportsdir
+    fulludpportsdir = target.fulludpportsdir
+    topudpportsdir = target.topudpportsdir
     servicesdir = target.servicesdir
     screenshotsdir = target.screenshotsdir
-    nmapdir = target.nmapdir
+    tcpservicesdir = target.tcpservicesdir
+    udpservicesdir = target.udpservicesdir
     niktodir = target.niktodir
     dirscandir = target.dirscandir
     crackingdir = target.crackingdir
@@ -1174,8 +1200,20 @@ def scan_host(target, concurrent_scans):
     tcpportsdir = os.path.join(scandir, 'ports', 'tcp')
     target.tcpportsdir = tcpportsdir
 
+    fulltcpportsdir = os.path.join(scandir, 'ports', 'tcp', 'full')
+    target.fulltcpportsdir = fulltcpportsdir
+
+    toptcpportsdir = os.path.join(scandir, 'ports', 'tcp', 'top')
+    target.toptcpportsdir = toptcpportsdir
+
     udpportsdir = os.path.join(scandir, 'ports', 'udp')
     target.udpportsdir = udpportsdir
+
+    fulludpportsdir = os.path.join(scandir, 'ports', 'udp', 'full')
+    target.fulludpportsdir = fulludpportsdir
+
+    topudpportsdir = os.path.join(scandir, 'ports', 'udp', 'top')
+    target.topudpportsdir = topudpportsdir
 
     servicesdir = os.path.join(scandir, 'services')
     target.servicesdir = servicesdir
@@ -1183,8 +1221,11 @@ def scan_host(target, concurrent_scans):
     screenshotsdir = os.path.join(TargetsDir, 'screenshots')
     target.screenshotsdir = screenshotsdir
 
-    nmapdir = os.path.join(servicesdir, 'nmap')
-    target.nmapdir = nmapdir
+    tcpservicesdir = os.path.join(servicesdir, 'nmap', 'tcp')
+    target.tcpservicesdir = tcpservicesdir
+
+    udpservicesdir = os.path.join(servicesdir, 'nmap', 'udp')
+    target.udpservicesdir = udpservicesdir
 
     niktodir = os.path.join(servicesdir, 'nikto')
     target.niktodir = niktodir
@@ -1201,10 +1242,15 @@ def scan_host(target, concurrent_scans):
     Path(scandir).mkdir(parents=True, exist_ok=True)
     Path(reportsdir).mkdir(parents=True, exist_ok=True)
     Path(tcpportsdir).mkdir(parents=True, exist_ok=True)
+    Path(fulltcpportsdir).mkdir(parents=True, exist_ok=True)
+    Path(toptcpportsdir).mkdir(parents=True, exist_ok=True)
     Path(udpportsdir).mkdir(parents=True, exist_ok=True)
+    Path(fulludpportsdir).mkdir(parents=True, exist_ok=True)
+    Path(topudpportsdir).mkdir(parents=True, exist_ok=True)
     Path(servicesdir).mkdir(parents=True, exist_ok=True)
     Path(screenshotsdir).mkdir(parents=True, exist_ok=True)
-    Path(nmapdir).mkdir(parents=True, exist_ok=True)
+    Path(tcpservicesdir).mkdir(parents=True, exist_ok=True)
+    Path(udpservicesdir).mkdir(parents=True, exist_ok=True)
     Path(niktodir).mkdir(parents=True, exist_ok=True)
     Path(dirscandir).mkdir(parents=True, exist_ok=True)
     Path(crackingdir).mkdir(parents=True, exist_ok=True)
@@ -1238,7 +1284,8 @@ class Target:
         self.addressname = address.replace('/', '_')
         self.screenshotsdir = ''
         self.reportsdir = ''
-        self.nmapdir = ''
+        self.tcpservicesdir = ''
+        self.udpservicesdir = ''
         self.niktodir = ''
         self.dirscandir = ''
         self.crackingdir = ''
@@ -1246,7 +1293,11 @@ class Target:
         self.speed = speed
         self.scansdir = ''
         self.tcpportsdir = ''
+        self.fulltcpportsdir = ''
+        self.toptcpportsdir = ''
         self.udpportsdir = ''
+        self.fulludpportsdir = ''
+        self.topudpportsdir = ''
         self.servicesdir = ''
         self.scans = []
         self.lock = None
