@@ -151,7 +151,7 @@ Scanning a network range(CIDR)
 sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ 192.168.10.0/24
 ```
 
-Scanning multiple targets
+Scanning multiple targets (comma separated)
 
 ```
 sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ 192.168.10.15 192.168.10.0/24 example.com
