@@ -1720,7 +1720,7 @@ def analyzetargets(raw_targets):
 def parseargs(psp_config: [], psp_config_file: string, lhsp_config: [], lhsp_config_file: string):
     ProgramArgs = namedtuple('ProgramArgs', 'concurrent_scans concurrent_targets errors heartbeat livehost_profile '
                                             'nmap_args patterns portscan_profile project_name speed target_file '
-                                            'targets verbose')
+                                            'targets verbose working_dir')
 
     err = False
 
@@ -1771,8 +1771,6 @@ def parseargs(psp_config: [], psp_config_file: string, lhsp_config: [], lhsp_con
 
     parser.error = lambda s: fail(s[0].upper() + s[1:])
     args = parser.parse_args()
-
-
 
     if args.concurrent_targets <= 0:
         error('Argument -ct/--concurrent-targets: must be at least 1.')
