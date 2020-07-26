@@ -2,15 +2,9 @@
 
 Perform automated network reconnaissance scans to gather network intelligence.
 
-IntelSpy is a multi-threaded network intelligence spy tool which performs automated enumeration of network services. It performs live hosts detection scans, port scans, services enumeration scans, web content scans, brute-force, detailed off-line exploits searches and more. 
+IntelSpy is a multi-threaded network intelligence tool which performs automated network services enumeration. It performs live hosts detection scans, port scans, services enumeration scans, web content scans, brute-forcing, detailed off-line exploits searches and more. 
 
 The tool will also launch further enumeration scans for each detected service using a number of different tools.
-
----
-
-### Credits
-
-I had started working on IntelSpy when one day I discovered [AutoRecon](https://github.com/Tib3rius/AutoRecon). Instead of reinventing the wheel, IntelSpy is the result of combining/merging IntelSpy with the best features of the AutoRecon to create a network reconnaissance tool suitable for Penetration Testing engagements.
 
 ---
 
@@ -20,19 +14,19 @@ I had started working on IntelSpy when one day I discovered [AutoRecon](https://
 * Scans targets concurrently.
 * Detects live hosts in an IP range (CIDR) network.
 * Customizable port scanning profiles and service enumeration commands.
-* Creates a directory structure for results gathering.
-* Logs commands that were run.
-* Generates shell scripts with commands to be run manually.
-* Extracts important information in txt and markdown format.
+* Creates a directory structure for results gathering and reporting.
+* Logs every command that was executed.
+* Generates shell scripts containing commands to be run manually.
+* Extracts important information in txt and markdown format for further inspection.
 * Stores data to an SQLite database.
-* Generates HTML report.
+* Generates an HTML report.
 
 ---
 
 ### Requirements
 
 * Python 3
-* colorama
+* Linux (preferably Kali Linux or any other hacking distribution containing the tools below.)
 * toml (https://github.com/toml-lang/toml)
 * seclists
 * curl
@@ -59,6 +53,7 @@ I had started working on IntelSpy when one day I discovered [AutoRecon](https://
 * ldapsearch
 * patator
 
+
 ```
 pip3 install -r requirements.txt
 sudo apt install seclists
@@ -69,16 +64,18 @@ sudo apt install seclists
 ### Usage
 
 ```
+$ python3 intelspy.py -h
+
  ___               __        
   |  ._ _|_  _  | (_  ._     
  _|_ | | |_ (/_ | __) |_) \/ 
                       |   /  
                                 
-IntelSpy v1.0 - Perform automated network reconnaissance scans to gather network intelligence.
+IntelSpy v2.0 - Perform automated network reconnaissance scans to gather network intelligence.
 IntelSpy is an open source tool licensed under GPLv3.
-Written by: @maldevel | @LOGISEK_LTD
-https://logisek.com | https://pentest-labs.com
-https://github.com/maldevel/intelspy
+Written by: @maldevel | Logisek ICT
+Web: https://logisek.com | https://pentest-labs.com
+Project: https://github.com/maldevel/intelspy
 
 
 usage: intelspy.py [-h] [-ts TARGET_FILE] -p PROJECT_NAME -w WORKING_DIR
@@ -123,7 +120,6 @@ optional arguments:
                         status messages. Default: 60
   -v, --verbose         Enable verbose output. Repeat for more verbosity (-v,
                         -vv, -vvv).
-
 ```
 
 ---
@@ -174,5 +170,11 @@ Excluding many hosts
 ```
 sudo python3 intelspy.py -p MyProjectName -w /home/user/pt/projects/ --exclude 192.168.10.9,192.168.10.24 192.168.10.0/24
 ```
+
+---
+
+### Credits
+
+I started working on IntelSpy when I discovered [AutoRecon](https://github.com/Tib3rius/AutoRecon). Instead of reinventing the wheel, IntelSpy is the result of merging IntelSpy with the best features of the AutoRecon to create a network reconnaissance tool suitable for Penetration Testing engagements.
 
 ---
