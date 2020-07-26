@@ -110,6 +110,9 @@ FinalReportHTMLFile = ''
 CommandsFile = ''
 ManualCommandsFile = ''
 
+username_wordlist = '/usr/share/seclists/Usernames/top-usernames-shortlist.txt'
+password_wordlist = '/usr/share/seclists/Passwords/darkweb2017-top100.txt'
+
 CurrentDateTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 DbConnection = None
 
@@ -249,8 +252,6 @@ def calculate_elapsed_time(start_time):
 #####################################################################################################################
 
 def loadprofiles(live_host_scan_profiles_file, port_scan_profiles_file):
-    username_wordlist = '/usr/share/seclists/Usernames/top-usernames-shortlist.txt'
-    password_wordlist = '/usr/share/seclists/Passwords/darkweb2017-top100.txt'
 
     with open(os.path.join(RootDir, 'profiles', live_host_scan_profiles_file), 'r') as p:
         try:
@@ -295,14 +296,13 @@ def loadprofiles(live_host_scan_profiles_file, port_scan_profiles_file):
 
     if 'username_wordlist' in service_scans_profiles:
         if isinstance(service_scans_profiles['username_wordlist'], str):
-            username_wordlist = service_scans_profiles['username_wordlist']
+            uw = service_scans_profiles['username_wordlist']
 
     if 'password_wordlist' in service_scans_profiles:
         if isinstance(service_scans_profiles['password_wordlist'], str):
-            password_wordlist = service_scans_profiles['password_wordlist']
+            pw = service_scans_profiles['password_wordlist']
 
-    return live_host_scan_profiles, port_scan_profiles, service_scans_profiles, global_patterns, username_wordlist, \
-           password_wordlist
+    return live_host_scan_profiles, port_scan_profiles, service_scans_profiles, global_patterns, uw, pw
 
 
 #####################################################################################################################
@@ -1937,8 +1937,10 @@ if __name__ == '__main__':
     port_scan_profiles_file = 'port-scan-profiles.toml'
     live_host_scan_profiles_file = 'live-host-scan-profiles.toml'
 
-    lhsps, psps, ssps, gp, uw, pw = loadprofiles(live_host_scan_profiles_file, port_scan_profiles_file)
+    lhsps, psps, ssps, gp, username_wordlist, password_wordlist = loadprofiles(live_host_scan_profiles_file,
+                                                                               port_scan_profiles_file)
 
+    print(username_wordlist)
     intelArgs = parseargs(psps, port_scan_profiles_file, lhsps, live_host_scan_profiles_file)
 
     if intelArgs.errors:
