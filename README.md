@@ -1,4 +1,4 @@
-![Alt text](logo.png?raw=true "Title")
+![Alt text](logo.png?raw=true "IntelSpy")
 
 Perform automated network reconnaissance scans to gather network intelligence.
 
