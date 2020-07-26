@@ -1720,7 +1720,7 @@ def analyzetargets(raw_targets):
 def parseargs(psp_config: [], psp_config_file: string, lhsp_config: [], lhsp_config_file: string):
     ProgramArgs = namedtuple('ProgramArgs', 'targets target_file project_name working_dir nmap_args speed errors '
                                             'concurrent_targets concurrent_scans portscan_profile livehost_profile '
-                                            'heartbeat verbose')
+                                            'heartbeat verbose', 'patterns')
 
     parser = argparse.ArgumentParser()
 
@@ -1835,7 +1835,7 @@ def parseargs(psp_config: [], psp_config_file: string, lhsp_config: [], lhsp_con
             error('The target file {args.target_file} could not be read.')
             sys.exit(1)
 
-    targets, patterns, ProgramArgs.errors = analyzetargets(raw_targets)
+    ProgramArgs.targets, ProgramArgs.patterns, ProgramArgs.errors = analyzetargets(raw_targets)
 
     return ProgramArgs
 
@@ -1859,6 +1859,8 @@ if __name__ == '__main__':
 
     if intelArgs.errors:
         sys.exit(1)
+
+    Matched_Patterns_Report = intelArgs.patterns
 
     if len(intelArgs.targets) == 0:
         error('You must specify at least one target to scan!')
