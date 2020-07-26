@@ -1849,8 +1849,7 @@ if __name__ == '__main__':
 
     checktoolsexistence()
 
-    intelArgs = parseargs(port_scan_profiles, port_scan_profiles_file,
-                          live_host_scan_profiles, live_host_scan_profiles_file)
+    intelArgs = parseargs(port_scan_profiles, port_scan_profiles_file, live_host_scan_profiles, live_host_scan_profiles_file)
 
     if not isroot():
         sys.exit(1)
