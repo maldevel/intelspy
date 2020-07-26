@@ -1675,11 +1675,12 @@ def checktoolsexistence():
 def analyzetargets(raw_targets):
     targets = []
     patterns = []
+    err = False
 
-    for target in raw_targets:
+    for t in raw_targets:
         try:
             # single ip address e.g. 192.168.1.10
-            ip = str(ipaddress.ip_address(target))
+            ip = str(ipaddress.ip_address(t))
 
             if ip not in targets:
                 targets.append(ip)
@@ -1687,11 +1688,11 @@ def analyzetargets(raw_targets):
 
             try:
                 # ip range(CIDR) e.g. 192.168.1.0/24
-                target_range = ipaddress.ip_network(target, strict=False)
-                dlh = detect_live_hosts(target)
+                target_range = ipaddress.ip_network(t, strict=False)
+                dlh = detect_live_hosts(t)
                 live_hosts = dlh[0]
-                matched_patterns = dlh[1]
-                patterns += matched_patterns
+                matchedpatterns = dlh[1]
+                patterns += matchedpatterns
 
                 if live_hosts:
                     for ip in live_hosts:
@@ -1702,16 +1703,16 @@ def analyzetargets(raw_targets):
 
                 try:
                     # domain e.g. example.com
-                    ip = socket.gethostbyname(target)
+                    ip = socket.gethostbyname(t)
 
-                    if target not in targets:
-                        targets.append(target)
+                    if t not in targets:
+                        targets.append(t)
 
                 except socket.gaierror:
-                    error(target + ' does not appear to be a valid IP address, IP range, or resolvable hostname.')
-                    errors = True
+                    error(t + ' does not appear to be a valid IP address, IP range, or resolvable hostname.')
+                    err = True
 
-    return targets, patterns, errors
+    return targets, patterns, err
 
 
 #####################################################################################################################
@@ -1876,18 +1877,18 @@ if __name__ == '__main__':
     with open(FinalReportMDFile, 'w') as file:
         file.write("# Final Report\n\n")
         file.write("## Target/s\n\n")
-        for target in targets:
+        for target in intelArgs.targets:
             dbaddTarget(target)
             file.write("* {0}\n".format(target))
 
         file.write("\n---\n\n")
         file.write("## Services\n\n")
 
-    with ProcessPoolExecutor(max_workers=args.concurrent_targets) as executor:
+    with ProcessPoolExecutor(max_workers=intelArgs.concurrent_targets) as executor:
         start_time = time.time()
         futures = []
 
-        for address in targets:
+        for address in intelArgs.targets:
             target = Target(address)
             futures.append(executor.submit(scan_host, target, concurrent_scans))
 
@@ -1930,7 +1931,7 @@ if __name__ == '__main__':
                 udpPortscommalist = ','.join(str(s) for s in uniqueUdpPorts)
 
                 file.write("## Hosts & Ports\n")
-                file.write("\n* **{0}**\n".format(','.join(targets)))
+                file.write("\n* **{0}**\n".format(','.join(intelArgs.targets)))
                 file.write("\n* TCP: **{0}**\n".format(tcpPortscommalist))
                 file.write("\n* UDP: **{0}**\n".format(udpPortscommalist))
                 file.write("\n---\n\n")
