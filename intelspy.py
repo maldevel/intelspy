@@ -1800,6 +1800,7 @@ def parseargs(psp_config: [], psp_config_file: string, lhsp_config: [], lhsp_con
             'in {lhsp_config_file}. No such profile found: {lhsp}')
         err = True
 
+    nmap_args = ''
     if args.exclude:
         nmap_args = "--exclude {}".format(args.exclude)
 
