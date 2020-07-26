@@ -1721,6 +1721,7 @@ def parseargs(psp_config: [], psp_config_file: string, lhsp_config: [], lhsp_con
     ProgramArgs = namedtuple('ProgramArgs', 'targets target_file project_name working_dir nmap_args speed errors '
                                             'concurrent_targets concurrent_scans portscan_profile livehost_profile '
                                             'heartbeat verbose', 'patterns')
+    myargs = ProgramArgs()
 
     parser = argparse.ArgumentParser()
 
@@ -1770,20 +1771,20 @@ def parseargs(psp_config: [], psp_config_file: string, lhsp_config: [], lhsp_con
     parser.error = lambda s: fail(s[0].upper() + s[1:])
     args = parser.parse_args()
 
-    ProgramArgs.errors = False
+    myargs.errors = False
 
-    ProgramArgs.concurrent_targets = args.concurrent_targets
-    ProgramArgs.speed = args.speed
+    myargs.concurrent_targets = args.concurrent_targets
+    myargs.speed = args.speed
 
-    if ProgramArgs.concurrent_targets <= 0:
+    if myargs.concurrent_targets <= 0:
         error('Argument -ct/--concurrent-targets: must be at least 1.')
-        ProgramArgs.errors = True
+        myargs.errors = True
 
-    ProgramArgs.concurrent_scans = args.concurrent_scans
+    myargs.concurrent_scans = args.concurrent_scans
 
-    if ProgramArgs.concurrent_scans <= 0:
+    if myargs.concurrent_scans <= 0:
         error('Argument -cs/--concurrent-scans: must be at least 1.')
-        ProgramArgs.errors = True
+        myargs.errors = True
 
     psp = args.profile_name
     found_scan_profile = findProfile(psp, psp_config)
@@ -1792,9 +1793,9 @@ def parseargs(psp_config: [], psp_config_file: string, lhsp_config: [], lhsp_con
         error(
             'Argument --profile: must reference a port scan profile defined in {psp_config_file}. '
             'No such profile found: {psp}')
-        ProgramArgs.errors = True
+        myargs.errors = True
 
-    ProgramArgs.portscan_profile = found_scan_profile
+    myargs.portscan_profile = found_scan_profile
 
     lhsp = args.livehost_profile_name
     found_live_host_scan_profile = findLiveHostProfile(lhsp, lhsp_config)
@@ -1803,16 +1804,16 @@ def parseargs(psp_config: [], psp_config_file: string, lhsp_config: [], lhsp_con
         error(
             'Argument --livehost-profile: must reference a live host scan profile defined '
             'in {lhsp_config_file}. No such profile found: {lhsp}')
-        ProgramArgs.errors = True
+        myargs.errors = True
 
-    ProgramArgs.livehost_profile = found_live_host_scan_profile
+    myargs.livehost_profile = found_live_host_scan_profile
 
     if args.exclude:
-        ProgramArgs.nmap_args = "--exclude {}".format(args.exclude)
+        myargs.nmap_args = "--exclude {}".format(args.exclude)
 
-    ProgramArgs.heartbeat = args.heartbeat
+    myargs.heartbeat = args.heartbeat
 
-    ProgramArgs.verbose = args.verbose
+    myargs.verbose = args.verbose
 
     raw_targets = args.targets
 
@@ -1835,9 +1836,9 @@ def parseargs(psp_config: [], psp_config_file: string, lhsp_config: [], lhsp_con
             error('The target file {args.target_file} could not be read.')
             sys.exit(1)
 
-    ProgramArgs.targets, ProgramArgs.patterns, ProgramArgs.errors = analyzetargets(raw_targets)
+    myargs.targets, myargs.patterns, myargs.errors = analyzetargets(raw_targets)
 
-    return ProgramArgs
+    return myargs
 
 
 #####################################################################################################################
