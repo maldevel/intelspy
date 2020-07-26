@@ -133,9 +133,9 @@ Matched_Patterns_Report = []
 port_scan_profiles_file = 'port-scan-profiles.toml'
 live_host_scan_profiles_file = 'live-host-scan-profiles.toml'
 
-tools = ['nmap', 'sslscan', 'curl', 'whatweb', 'wkhtmltoimage', 'nikto', 'gobuster', 'enum4linux', 'nbtscan',
-         'smbclient', 'smbmap', 'onesixtyone', 'snmpwalk', 'showmount', 'tnscmd10g', 'svwar', 'smtp-user-enum',
-         'pandoc']
+tools = ['curl', 'enum4linux', 'gobuster', 'nbtscan', 'nikto', 'nmap', 'onesixtyone', 'pandoc', 'showmount',
+         'smbclient', 'smbmap', 'smtp-user-enum', 'snmpwalk', 'sslscan', 'svwar', 'tnscmd10g', 'whatweb',
+         'wkhtmltoimage']
 
 
 #####################################################################################################################
@@ -1668,6 +1668,7 @@ def checktoolsexistence():
         exists = shutil.which(tool)
         if exists is None:
             error('The {tool} tool is missing. Please install it (e.g. \'sudo apt install {tool}\').')
+
 
 #####################################################################################################################
 

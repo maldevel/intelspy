@@ -58,7 +58,6 @@ The tool will also launch further enumeration scans for each detected service us
 
 ```
 pip3 install -r requirements.txt
-sudo apt install seclists
 ```
 
 ---
