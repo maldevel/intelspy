@@ -34,7 +34,7 @@
 import atexit
 import argparse
 import asyncio
-#import colorama
+# import colorama
 from colorama import Fore, Style
 from concurrent.futures import ProcessPoolExecutor, as_completed, FIRST_COMPLETED
 from datetime import datetime
@@ -51,9 +51,10 @@ from pathlib import Path
 from datetime import timezone
 import sqlite3
 import subprocess
-#from subprocess import Popen, PIPE, STDOUT
+# from subprocess import Popen, PIPE, STDOUT
 from random import randrange
 from collections import namedtuple
+import shutil
 
 #####################################################################################################################
 
@@ -131,6 +132,11 @@ Matched_Patterns_Report = []
 
 port_scan_profiles_file = 'port-scan-profiles.toml'
 live_host_scan_profiles_file = 'live-host-scan-profiles.toml'
+
+tools = ['nmap', 'sslscan', 'curl', 'whatweb', 'wkhtmltoimage', 'nikto', 'gobuster', 'enum4linux', 'nbtscan',
+         'smbclient', 'smbmap', 'onesixtyone', 'snmpwalk', 'showmount', 'tnscmd10g', 'svwar', 'smtp-user-enum',
+         'pandoc']
+
 
 #####################################################################################################################
 def e(*args, frame_index=1, **kvargs):
@@ -257,36 +263,36 @@ def calculate_elapsed_time(start_time):
 #####################################################################################################################
 
 
-with open(os.path.join(RootDir, 'config', live_host_scan_profiles_file), 'r') as p:
+with open(os.path.join(RootDir, 'profiles', live_host_scan_profiles_file), 'r') as p:
     try:
         live_host_scan_profiles_config = toml.load(p)
 
         if len(live_host_scan_profiles_config) == 0:
             fail(
-                'There do not appear to be any port scan profiles configured in the {live_host_scan_profiles_file} config file.')
+                'There do not appear to be any port scan profiles configured in the {live_host_scan_profiles_file} profiles file.')
 
     except toml.decoder.TomlDecodeError as e:
         fail(
-            'Error: Couldn\'t parse {live_host_scan_profiles_file} config file. Check syntax and duplicate tags.')
+            'Error: Couldn\'t parse {live_host_scan_profiles_file} profiles file. Check syntax and duplicate tags.')
 
-with open(os.path.join(RootDir, 'config', port_scan_profiles_file), 'r') as p:
+with open(os.path.join(RootDir, 'profiles', port_scan_profiles_file), 'r') as p:
     try:
         port_scan_profiles_config = toml.load(p)
 
         if len(port_scan_profiles_config) == 0:
             fail(
-                'There do not appear to be any port scan profiles configured in the {port_scan_profiles_file} config file.')
+                'There do not appear to be any port scan profiles configured in the {port_scan_profiles_file} profiles file.')
 
     except toml.decoder.TomlDecodeError as e:
-        fail('Error: Couldn\'t parse {port_scan_profiles_file} config file. Check syntax and duplicate tags.')
+        fail('Error: Couldn\'t parse {port_scan_profiles_file} profiles file. Check syntax and duplicate tags.')
 
-with open(os.path.join(RootDir, 'config', 'service-scans.toml'), 'r') as c:
+with open(os.path.join(RootDir, 'profiles', 'service-scans-profiles.toml'), 'r') as c:
     try:
         service_scans_profiles = toml.load(c)
     except toml.decoder.TomlDecodeError as e:
-        fail('Error: Couldn\'t parse service-scans.toml config file. Check syntax and duplicate tags.')
+        fail('Error: Couldn\'t parse service-scans-profiles.toml profiles file. Check syntax and duplicate tags.')
 
-with open(os.path.join(RootDir, 'config', 'global-patterns.toml'), 'r') as p:
+with open(os.path.join(RootDir, 'profiles', 'global-patterns.toml'), 'r') as p:
     try:
         global_patterns = toml.load(p)
         if 'pattern' in global_patterns:
@@ -294,9 +300,10 @@ with open(os.path.join(RootDir, 'config', 'global-patterns.toml'), 'r') as p:
         else:
             global_patterns = []
     except toml.decoder.TomlDecodeError as e:
-        fail('Error: Couldn\'t parse global-patterns.toml config file. Check syntax and duplicate tags.')
+        fail('Error: Couldn\'t parse global-patterns.toml profiles file. Check syntax and duplicate tags.')
 
 #####################################################################################################################
+
 if 'username_wordlist' in service_scans_profiles:
     if isinstance(service_scans_profiles['username_wordlist'], str):
         username_wordlist = service_scans_profiles['username_wordlist']
@@ -307,6 +314,7 @@ if 'password_wordlist' in service_scans_profiles:
 
 
 #####################################################################################################################
+
 async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
     matched_patterns = []
     address = target.address
@@ -1177,7 +1185,7 @@ async def scan_services(loop, semaphore, target):
                                                 scan_tuple = (protocol, port, service, name)
                                                 if scan_tuple in target.scans:
                                                     warn(
-                                                        Fore.YELLOW + '[' + Style.BRIGHT + tag + ' on ' + address + Style.NORMAL + '] Scan appears to have already been queued, but it is not marked as run_once in service-scans.toml. Possible duplicate tag? Skipping.' + Fore.RESET)
+                                                        Fore.YELLOW + '[' + Style.BRIGHT + tag + ' on ' + address + Style.NORMAL + '] Scan appears to have already been queued, but it is not marked as run_once in service-scans-profiles.toml. Possible duplicate tag? Skipping.' + Fore.RESET)
                                                     continue
                                                 else:
                                                     target.scans.append(scan_tuple)
@@ -1655,6 +1663,14 @@ def html(mdfile, htmlfile):
 
 #####################################################################################################################
 
+def checktoolsexistence():
+    for tool in tools:
+        exists = shutil.which(tool)
+        if exists is None:
+            error('The {tool} tool is missing. Please install it (e.g. \'sudo apt install {tool}\').')
+
+#####################################################################################################################
+
 def analyzetargets(raw_targets):
     targets = []
     patterns = []
@@ -1829,6 +1845,8 @@ if __name__ == '__main__':
     print(message)
     start_time = time.time()
 
+    checktoolsexistence()
+
     intelArgs = parseargs(port_scan_profiles, port_scan_profiles_file,
                           live_host_scan_profiles, live_host_scan_profiles_file)
 
@@ -1837,12 +1855,12 @@ if __name__ == '__main__':
 
     warn('Running with root privileges.')
 
+    if intelArgs.errors:
+        sys.exit(1)
+
     if len(intelArgs.targets) == 0:
         error('You must specify at least one target to scan!')
         errors = True
-
-    if intelArgs.errors:
-        sys.exit(1)
 
     srvname = ''
 

@@ -25,33 +25,35 @@ The tool will also launch further enumeration scans for each detected service us
 
 ### Requirements
 
-* Python 3
+* Python 3 ('sudo apt install python3')
 * Linux (preferably Kali Linux or any other hacking distribution containing the tools below.)
+  * https://www.kali.org/downloads/
 * toml (https://github.com/toml-lang/toml)
-* seclists
-* curl
-* enum4linux
-* gobuster
-* nbtscan
-* nikto
-* nmap
-* onesixtyone
-* oscanner
-* smbclient
-* smbmap
-* smtp-user-enum
-* snmpwalk
-* sslscan
-* svwar
-* tnscmd10g
-* whatweb
-* wkhtmltoimage
-* pandoc
-* hydra
-* medusa
-* wpscan
-* ldapsearch
-* patator
+* seclists (https://github.com/danielmiessler/SecLists)
+curl (prerequisite) ('sudo apt install curl')
+enum4linux (prerequisite) ('sudo apt install enum4linux')
+gobuster (prerequisite) ('sudo apt install gobuster')
+hydra (optional) ('sudo apt install hydra')
+ldapsearch (optional) ('sudo apt install ldap-utils')
+medusa (optional) ('sudo apt install medusa')
+nbtscan (prerequisite) ('sudo apt install nbtscan')
+nikto (prerequisite) ('sudo apt install nikto')
+nmap (prerequisite) ('sudo apt install nmap')
+onesixtyone (prerequisite) ('sudo apt install onesixtyone')
+oscanner (optional) ('sudo apt install oscanner')
+pandoc (prerequisite) ('sudo apt install pandoc')
+patator (optional) ('sudo apt install patator')
+showmount (prerequisite) ('system tool')
+smbclient (prerequisite) ('sudo apt install smbclient')
+smbmap (prerequisite) ('sudo apt install smbmap')
+smtp-user-enum (prerequisite) ('sudo apt install smtp-user-enum')
+snmpwalk (prerequisite) ('sudo apt install snmp')
+sslscan (prerequisite) ('sudo apt install sslscan')
+svwar (prerequisite) ('sudo apt install sipvicious')
+tnscmd10g (prerequisite) ('sudo apt install tnscmd10g')
+whatweb (prerequisite) ('sudo apt install whatweb')
+wkhtmltoimage (prerequisite) (https://github.com/wkhtmltopdf/wkhtmltopdf/)
+wpscan (optional) ('sudo apt install wpscan')
 
 
 ```
