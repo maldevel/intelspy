@@ -93,19 +93,8 @@ TERM_FLAGS = termios.tcgetattr(sys.stdin.fileno())
 verbose = 0
 speed = 4
 # nmap = '-vv --reason -Pn'
-nmap = ''
-srvname = ''
+nmap=''
 heartbeat_interval = 60
-port_scan_profile = None
-live_host_scan_profile = None
-
-live_host_scan_profiles = []
-port_scan_profiles = []
-service_scans_profiles = []
-global_patterns = []
-
-username_wordlist = '/usr/share/seclists/Usernames/top-usernames-shortlist.txt'
-password_wordlist = '/usr/share/seclists/Passwords/darkweb2017-top100.txt'
 
 RootDir = os.path.dirname(os.path.realpath(__file__))
 ProjectDir = ''
@@ -114,7 +103,6 @@ DatabaseDir = ''
 LogsDir = ''
 ReportDir = ''
 TargetsDir = ''
-
 LogsFile = ''
 DatabaseFile = ''
 FinalReportMDFile = ''
@@ -125,13 +113,7 @@ ManualCommandsFile = ''
 CurrentDateTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 DbConnection = None
 
-concurrent_scans = 1
-concurrent_targets = 1
-
 Matched_Patterns_Report = []
-
-port_scan_profiles_file = 'port-scan-profiles.toml'
-live_host_scan_profiles_file = 'live-host-scan-profiles.toml'
 
 tools = ['curl', 'enum4linux', 'gobuster', 'nbtscan', 'nikto', 'nmap', 'onesixtyone', 'pandoc', 'showmount',
          'smbclient', 'smbmap', 'smtp-user-enum', 'snmpwalk', 'sslscan', 'svwar', 'tnscmd10g', 'whatweb',
@@ -205,7 +187,7 @@ def cprint(*args, type='info', color=Fore.RESET, char='*', sep=' ', end='\n', fr
     #         logStr = re.sub(r"\[[0-9]{1,2}m", "", logStr)
     #         logFile.write("[{0} {1}] {2} Type={3} Log=\"{4}\"\n".format(ts, tz, hostname, type, logStr))
     # except Exception as e:
-    #     print(e)
+    #
     #     #sys.exit(1)
 
 
@@ -225,6 +207,10 @@ def warn(*args, sep=' ', end='\n', file=sys.stderr, **kvargs):
 
 def error(*args, sep=' ', end='\n', file=sys.stderr, **kvargs):
     cprint(*args, type='error', color=Fore.RED, char='!', sep=sep, end=end, file=file, frame_index=2, **kvargs)
+
+
+def question(*args, sep=' ', end='', file=sys.stderr, **kvargs):
+    cprint(*args, type='warning', color=Fore.YELLOW, char='?', sep=sep, end=end, file=file, frame_index=2, **kvargs)
 
 
 def fail(*args, sep=' ', end='\n', file=sys.stderr, **kvargs):
@@ -262,60 +248,66 @@ def calculate_elapsed_time(start_time):
 
 #####################################################################################################################
 
+def loadprofiles(live_host_scan_profiles_file, port_scan_profiles_file):
+    username_wordlist = '/usr/share/seclists/Usernames/top-usernames-shortlist.txt'
+    password_wordlist = '/usr/share/seclists/Passwords/darkweb2017-top100.txt'
 
-with open(os.path.join(RootDir, 'profiles', live_host_scan_profiles_file), 'r') as p:
-    try:
-        live_host_scan_profiles_config = toml.load(p)
+    with open(os.path.join(RootDir, 'profiles', live_host_scan_profiles_file), 'r') as p:
+        try:
+            live_host_scan_profiles = toml.load(p)
 
-        if len(live_host_scan_profiles_config) == 0:
+            if len(live_host_scan_profiles) == 0:
+                fail(
+                    'There do not appear to be any port scan profiles configured in the {live_host_scan_profiles_file} '
+                    'profiles file.')
+
+        except toml.decoder.TomlDecodeError as e:
             fail(
-                'There do not appear to be any port scan profiles configured in the {live_host_scan_profiles_file} profiles file.')
+                'Error: Couldn\'t parse {live_host_scan_profiles_file} profiles file. Check syntax and duplicate tags.')
 
-    except toml.decoder.TomlDecodeError as e:
-        fail(
-            'Error: Couldn\'t parse {live_host_scan_profiles_file} profiles file. Check syntax and duplicate tags.')
+    with open(os.path.join(RootDir, 'profiles', port_scan_profiles_file), 'r') as p:
+        try:
+            port_scan_profiles = toml.load(p)
 
-with open(os.path.join(RootDir, 'profiles', port_scan_profiles_file), 'r') as p:
-    try:
-        port_scan_profiles_config = toml.load(p)
+            if len(port_scan_profiles) == 0:
+                fail(
+                    'There do not appear to be any port scan profiles configured in the {port_scan_profiles_file} '
+                    'profiles file.')
 
-        if len(port_scan_profiles_config) == 0:
-            fail(
-                'There do not appear to be any port scan profiles configured in the {port_scan_profiles_file} profiles file.')
+        except toml.decoder.TomlDecodeError as e:
+            fail('Error: Couldn\'t parse {port_scan_profiles_file} profiles file. Check syntax and duplicate tags.')
 
-    except toml.decoder.TomlDecodeError as e:
-        fail('Error: Couldn\'t parse {port_scan_profiles_file} profiles file. Check syntax and duplicate tags.')
+    with open(os.path.join(RootDir, 'profiles', 'service-scans-profiles.toml'), 'r') as c:
+        try:
+            service_scans_profiles = toml.load(c)
+        except toml.decoder.TomlDecodeError as e:
+            fail('Error: Couldn\'t parse service-scans-profiles.toml profiles file. Check syntax and duplicate tags.')
 
-with open(os.path.join(RootDir, 'profiles', 'service-scans-profiles.toml'), 'r') as c:
-    try:
-        service_scans_profiles = toml.load(c)
-    except toml.decoder.TomlDecodeError as e:
-        fail('Error: Couldn\'t parse service-scans-profiles.toml profiles file. Check syntax and duplicate tags.')
+    with open(os.path.join(RootDir, 'profiles', 'global-patterns.toml'), 'r') as p:
+        try:
+            global_patterns = toml.load(p)
+            if 'pattern' in global_patterns:
+                global_patterns = global_patterns['pattern']
+            else:
+                global_patterns = []
+        except toml.decoder.TomlDecodeError as e:
+            fail('Error: Couldn\'t parse global-patterns.toml profiles file. Check syntax and duplicate tags.')
 
-with open(os.path.join(RootDir, 'profiles', 'global-patterns.toml'), 'r') as p:
-    try:
-        global_patterns = toml.load(p)
-        if 'pattern' in global_patterns:
-            global_patterns = global_patterns['pattern']
-        else:
-            global_patterns = []
-    except toml.decoder.TomlDecodeError as e:
-        fail('Error: Couldn\'t parse global-patterns.toml profiles file. Check syntax and duplicate tags.')
+    if 'username_wordlist' in service_scans_profiles:
+        if isinstance(service_scans_profiles['username_wordlist'], str):
+            username_wordlist = service_scans_profiles['username_wordlist']
+
+    if 'password_wordlist' in service_scans_profiles:
+        if isinstance(service_scans_profiles['password_wordlist'], str):
+            password_wordlist = service_scans_profiles['password_wordlist']
+
+    return live_host_scan_profiles, port_scan_profiles, service_scans_profiles, global_patterns, username_wordlist, \
+           password_wordlist
+
 
 #####################################################################################################################
 
-if 'username_wordlist' in service_scans_profiles:
-    if isinstance(service_scans_profiles['username_wordlist'], str):
-        username_wordlist = service_scans_profiles['username_wordlist']
-
-if 'password_wordlist' in service_scans_profiles:
-    if isinstance(service_scans_profiles['password_wordlist'], str):
-        password_wordlist = service_scans_profiles['password_wordlist']
-
-
-#####################################################################################################################
-
-async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
+async def read_stream(stream, target, global_patterns, tag='?', patterns=[], color=Fore.BLUE):
     matched_patterns = []
     address = target.address
     addressname = target.addressname
@@ -400,7 +392,7 @@ async def read_stream(stream, target, tag='?', patterns=[], color=Fore.BLUE):
 
 
 #####################################################################################################################
-async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
+async def run_cmd(semaphore, cmd, target, global_patterns, tag='?', patterns=[]):
     async with semaphore:
         matched_patterns = []
         address = target.address
@@ -438,8 +430,8 @@ async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
             target.running_tasks.append(tag)
 
         output = [
-            read_stream(process.stdout, target, tag=tag, patterns=patterns),
-            read_stream(process.stderr, target, tag=tag, patterns=patterns, color=Fore.RED)
+            read_stream(process.stdout, target, global_patterns, tag=tag, patterns=patterns),
+            read_stream(process.stderr, target, global_patterns, tag=tag, patterns=patterns, color=Fore.RED)
         ]
 
         results = await asyncio.gather(*output)
@@ -461,12 +453,10 @@ async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
                 timestp = "[{0} {1}] {2}".format(ts, tz, hostname)
                 file.writelines(
                     e('{timestp} Task {tag} returned non-zero exit code: {process.returncode}. Command: {cmd}\n'))
-                # file.writelines(e('[*] Task {tag} returned non-zero exit code: {process.returncode}. Command: {cmd}\n'))
     else:
         info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
 
-    # results = results[0][0]
-    # print(results)
+
     if results[0]:
         matched_patterns = results[0]
 
@@ -474,7 +464,7 @@ async def run_cmd(semaphore, cmd, target, tag='?', patterns=[]):
 
 
 #####################################################################################################################
-async def parse_port_scan(stream, tag, target, pattern):
+async def parse_port_scan(stream, tag, target, pattern, global_patterns):
     matched_patterns = []
     address = target.address
     addressname = target.addressname
@@ -509,7 +499,6 @@ async def parse_port_scan(stream, tag, target, pattern):
                                 if mp not in matched_patterns:
                                     matched_patterns.append(mp)
 
-
                 else:
                     for match in matches:
                         if verbose >= 1:
@@ -523,8 +512,6 @@ async def parse_port_scan(stream, tag, target, pattern):
                                 mp = e('{target.address} - ' + p['description'] + '\n\n').strip()
                                 if mp not in matched_patterns:
                                     matched_patterns.append(mp)
-
-
         else:
             break
 
@@ -532,7 +519,7 @@ async def parse_port_scan(stream, tag, target, pattern):
 
 
 #####################################################################################################################
-async def parse_live_host_detection(stream, tag, target, pattern):
+async def parse_live_host_detection(stream, tag, target, pattern, global_patterns):
     matched_patterns = []
     address = target.address
     addressname = target.addressname
@@ -593,7 +580,7 @@ async def parse_live_host_detection(stream, tag, target, pattern):
 
 
 #####################################################################################################################
-async def parse_service_detection(stream, tag, target, pattern):
+async def parse_service_detection(stream, tag, target, pattern, global_patterns):
     matched_patterns = []
     address = target.address
     addressname = target.addressname
@@ -653,7 +640,7 @@ async def parse_service_detection(stream, tag, target, pattern):
 
 
 #####################################################################################################################
-async def run_livehostscan(semaphore, tag, target, live_host_detection):
+async def run_livehostscan(semaphore, tag, target, live_host_detection, global_patterns, nmapextra):
     async with semaphore:
 
         address = target.address
@@ -661,7 +648,7 @@ async def run_livehostscan(semaphore, tag, target, live_host_detection):
         reportsdir = target.reportsdir
         scandir = target.scansdir
         nmap_speed = target.speed
-        nmap_extra = nmap
+        nmap_extra = nmapextra
         tcpportsdir = target.tcpportsdir
         fulltcpportsdir = target.fulltcpportsdir
         toptcpportsdir = target.toptcpportsdir
@@ -696,8 +683,8 @@ async def run_livehostscan(semaphore, tag, target, live_host_detection):
             target.running_tasks.append(tag)
 
         output = [
-            parse_live_host_detection(process.stdout, tag, target, pattern),
-            read_stream(process.stderr, target, tag=tag, color=Fore.RED)
+            parse_live_host_detection(process.stdout, tag, target, pattern, global_patterns),
+            read_stream(process.stderr, target, global_patterns, tag=tag, color=Fore.RED)
         ]
 
         results = await asyncio.gather(*output)
@@ -727,7 +714,7 @@ async def run_livehostscan(semaphore, tag, target, live_host_detection):
 
 
 #####################################################################################################################
-async def run_portscan(semaphore, tag, target, service_detection, port_scan=None):
+async def run_portscan(semaphore, tag, target, service_detection, global_patterns, nmapextra, port_scan=None):
     async with semaphore:
         ports_matched_patterns = []
         services_matched_patterns = []
@@ -736,7 +723,7 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
         reportsdir = target.reportsdir
         scandir = target.scansdir
         nmap_speed = target.speed
-        nmap_extra = nmap
+        nmap_extra = nmapextra
         tcpportsdir = target.tcpportsdir
         fulltcpportsdir = target.fulltcpportsdir
         toptcpportsdir = target.toptcpportsdir
@@ -774,8 +761,8 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
                 target.running_tasks.append(tag)
 
             output = [
-                parse_port_scan(process.stdout, tag, target, pattern),
-                read_stream(process.stderr, target, tag=tag, color=Fore.RED)
+                parse_port_scan(process.stdout, tag, target, pattern, global_patterns),
+                read_stream(process.stderr, target, global_patterns, tag=tag, color=Fore.RED)
             ]
 
             results = await asyncio.gather(*output)
@@ -826,8 +813,8 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
             target.running_tasks.append(tag)
 
         output = [
-            parse_service_detection(process.stdout, tag, target, pattern),
-            read_stream(process.stderr, target, tag=tag, color=Fore.RED)
+            parse_service_detection(process.stdout, tag, target, pattern, global_patterns),
+            read_stream(process.stderr, target, global_patterns, tag=tag, color=Fore.RED)
         ]
 
         results = await asyncio.gather(*output)
@@ -839,14 +826,17 @@ async def run_portscan(semaphore, tag, target, service_detection, port_scan=None
 
         if process.returncode != 0:
             error(
-                'Service detection {bred}{tag}{rst} on {byellow}{address}{rst} returned non-zero exit code: {process.returncode}')
+                'Service detection {bred}{tag}{rst} on {byellow}{address}{rst} returned non-zero exit '
+                'code: {process.returncode}')
             async with target.lock:
                 with open(os.path.join(reportsdir, target.address.replace('/', '_') + '_errors.log'), 'a') as file:
                     file.writelines(e(
-                        '[*] Service detection {tag} returned non-zero exit code: {process.returncode}. Command: {command}\n'))
+                        '[*] Service detection {tag} returned non-zero exit code: {process.returncode}. '
+                        'Command: {command}\n'))
         else:
             info(
-                'Service detection {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
+                'Service detection {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully '
+                'in {elapsed_time}')
 
         services = results[0][0]
         services_matched_patterns = results[0][1]
@@ -871,14 +861,17 @@ async def start_heartbeat(target, period=60):
 
             if count > 1:
                 info(
-                    '{bgreen}[{current_time}]{rst} - There are {byellow}{count}{rst} tasks still running on {byellow}{target.address}{rst}' + tasks_list)
+                    '{bgreen}[{current_time}]{rst} - There are {byellow}{count}{rst} tasks still running '
+                    'on {byellow}{target.address}{rst}' + tasks_list)
             elif count == 1:
                 info(
-                    '{bgreen}[{current_time}]{rst} - There is {byellow}1{rst} task still running on {byellow}{target.address}{rst}' + tasks_list)
+                    '{bgreen}[{current_time}]{rst} - There is {byellow}1{rst} task still running '
+                    'on {byellow}{target.address}{rst}' + tasks_list)
 
 
 #####################################################################################################################
-async def ping_and_scan(loop, semaphore, target):
+async def ping_and_scan(loop, semaphore, target, live_host_scan_profiles, live_host_scan_profile, global_patterns,
+                        nmapextra):
     address = target.address
     addressname = target.addressname
     reportsdir = target.reportsdir
@@ -901,13 +894,14 @@ async def ping_and_scan(loop, semaphore, target):
 
     heartbeat = loop.create_task(start_heartbeat(target, period=heartbeat_interval))
 
-    for profile in live_host_scan_profiles_config:
+    for profile in live_host_scan_profiles:
         if profile == live_host_scan_profile:  # default: default
 
-            for scan in live_host_scan_profiles_config[profile]:
-                live_host_detection = (live_host_scan_profiles_config[profile][scan]['live-host-detection']['command'],
-                                       live_host_scan_profiles_config[profile][scan]['live-host-detection']['pattern'])
-                pending.append(run_livehostscan(semaphore, scan, target, live_host_detection))
+            for scan in live_host_scan_profiles[profile]:
+                live_host_detection = (live_host_scan_profiles[profile][scan]['live-host-detection']['command'],
+                                       live_host_scan_profiles[profile][scan]['live-host-detection']['pattern'])
+                pending.append(run_livehostscan(semaphore, scan, target, live_host_detection, global_patterns,
+                                                nmapextra))
             break
 
     live_hosts = []
@@ -946,13 +940,14 @@ async def ping_and_scan(loop, semaphore, target):
 
 
 #####################################################################################################################
-async def scan_services(loop, semaphore, target):
+async def scan_services(loop, semaphore, target, port_scan_profiles, port_scan_profile, service_scans_profiles,
+                        global_patterns, nmapextra):
     address = target.address
     addressname = target.addressname
     reportsdir = target.reportsdir
     scandir = target.scansdir
     nmap_speed = target.speed
-    nmap_extra = nmap
+    nmap_extra = ''
     pending = []
     tcpportsdir = target.tcpportsdir
     fulltcpportsdir = target.fulltcpportsdir
@@ -971,20 +966,21 @@ async def scan_services(loop, semaphore, target):
 
     heartbeat = loop.create_task(start_heartbeat(target, period=heartbeat_interval))
 
-    for profile in port_scan_profiles_config:
+    for profile in port_scan_profiles:
         if profile == port_scan_profile:  # default: default
 
-            for scan in port_scan_profiles_config[profile]:
+            for scan in port_scan_profiles[profile]:
 
-                service_detection = (port_scan_profiles_config[profile][scan]['service-detection']['command'],
-                                     port_scan_profiles_config[profile][scan]['service-detection']['pattern'])
+                service_detection = (port_scan_profiles[profile][scan]['service-detection']['command'],
+                                     port_scan_profiles[profile][scan]['service-detection']['pattern'])
 
-                if 'port-scan' in port_scan_profiles_config[profile][scan]:
-                    port_scan = (port_scan_profiles_config[profile][scan]['port-scan']['command'],
-                                 port_scan_profiles_config[profile][scan]['port-scan']['pattern'])
-                    pending.append(run_portscan(semaphore, scan, target, service_detection, port_scan))
+                if 'port-scan' in port_scan_profiles[profile][scan]:
+                    port_scan = (port_scan_profiles[profile][scan]['port-scan']['command'],
+                                 port_scan_profiles[profile][scan]['port-scan']['pattern'])
+                    pending.append(run_portscan(semaphore, scan, target, service_detection, global_patterns,
+                                                nmapextra, port_scan))
                 else:
-                    pending.append(run_portscan(semaphore, scan, target, service_detection))
+                    pending.append(run_portscan(semaphore, scan, target, service_detection, global_patterns, nmapextra))
             break
 
     target_services = {}
@@ -1038,9 +1034,9 @@ async def scan_services(loop, semaphore, target):
                             file.writelines(e('[*] {service} found on {protocol}/{port}.\n\n'))
 
                         if protocol == 'udp':
-                            nmap_extra = nmap + " -sU"
+                            nmap_extra = nmapextra + " -sU"
                         else:
-                            nmap_extra = nmap
+                            nmap_extra = nmapextra
 
                         secure = True if 'ssl' in service or 'tls' in service else False
 
@@ -1170,14 +1166,19 @@ async def scan_services(loop, semaphore, target):
 
                                                 if port_match == False:
                                                     warn(
-                                                        Fore.YELLOW + '[' + Style.BRIGHT + tag + Style.NORMAL + '] Scan cannot be run against {protocol} port {port}. Skipping.' + Fore.RESET)
+                                                        Fore.YELLOW + '[' + Style.BRIGHT + tag + Style.NORMAL +
+                                                        '] Scan cannot be run against {protocol} port {port}. '
+                                                        'Skipping.' + Fore.RESET)
                                                     continue
 
                                             if 'run_once' in scan and scan['run_once'] == True:
                                                 scan_tuple = (name,)
                                                 if scan_tuple in target.scans:
                                                     warn(
-                                                        Fore.YELLOW + '[' + Style.BRIGHT + tag + ' on ' + address + Style.NORMAL + '] Scan should only be run once and it appears to have already been queued. Skipping.' + Fore.RESET)
+                                                        Fore.YELLOW + '[' + Style.BRIGHT + tag + ' on ' + address +
+                                                        Style.NORMAL + '] Scan should only be run once and it appears '
+                                                                       'to have already been queued. Skipping.' +
+                                                        Fore.RESET)
                                                     continue
                                                 else:
                                                     target.scans.append(scan_tuple)
@@ -1185,7 +1186,11 @@ async def scan_services(loop, semaphore, target):
                                                 scan_tuple = (protocol, port, service, name)
                                                 if scan_tuple in target.scans:
                                                     warn(
-                                                        Fore.YELLOW + '[' + Style.BRIGHT + tag + ' on ' + address + Style.NORMAL + '] Scan appears to have already been queued, but it is not marked as run_once in service-scans-profiles.toml. Possible duplicate tag? Skipping.' + Fore.RESET)
+                                                        Fore.YELLOW + '[' + Style.BRIGHT + tag + ' on ' + address +
+                                                        Style.NORMAL + '] Scan appears to have already been queued, '
+                                                                       'but it is not marked as run_once in '
+                                                                       'service-scans-profiles.toml. '
+                                                                       'Possible duplicate tag? Skipping.' + Fore.RESET)
                                                     continue
                                                 else:
                                                     target.scans.append(scan_tuple)
@@ -1195,16 +1200,15 @@ async def scan_services(loop, semaphore, target):
                                                 patterns = scan['pattern']
 
                                             pending.add(asyncio.ensure_future(
-                                                run_cmd(semaphore, e(command), target, tag=tag, patterns=patterns)))
-                                            # pending.add(run_cmd(semaphore, e(command), target, tag=tag, patterns=patterns))
-                                            # print(e(command))
-                                            ####
+                                                run_cmd(semaphore, e(command), target, global_patterns,
+                                                        tag=tag, patterns=patterns)))
 
     return target_services, matched_patterns
 
 
 #####################################################################################################################
-def scan_live_hosts(target, concurrent_scans):
+def scan_live_hosts(target, concurrent_scans, live_host_scan_profiles, live_host_scan_profile, global_patterns,
+                    nmapextra):
     start_time = time.time()
     info('Scanning target {byellow}{target.address}{rst} for live hosts')
 
@@ -1227,7 +1231,10 @@ def scan_live_hosts(target, concurrent_scans):
     semaphore = asyncio.Semaphore(concurrent_scans)
 
     try:
-        results = loop.run_until_complete(asyncio.gather(ping_and_scan(loop, semaphore, target)))
+        results = loop.run_until_complete(asyncio.gather(ping_and_scan(loop, semaphore, target,
+                                                                       live_host_scan_profiles,
+                                                                       live_host_scan_profile,
+                                                                       global_patterns, nmapextra)))
         elapsed_time = calculate_elapsed_time(start_time)
         info('Finished scanning target {byellow}{target.address}{rst} in {elapsed_time}')
         return results
@@ -1237,7 +1244,9 @@ def scan_live_hosts(target, concurrent_scans):
 
 
 #####################################################################################################################
-def scan_host(target, concurrent_scans):
+def scan_host(target, concurrent_scans, port_scan_profiles, port_scan_profile, service_scans_profiles,
+              global_patterns, nmapextra):
+
     start_time = time.time()
     info('Scanning target {byellow}{target.address}{rst}')
 
@@ -1316,7 +1325,10 @@ def scan_host(target, concurrent_scans):
     semaphore = asyncio.Semaphore(concurrent_scans)
 
     try:
-        results = loop.run_until_complete(asyncio.gather(scan_services(loop, semaphore, target)))
+        results = loop.run_until_complete(asyncio.gather(scan_services(loop, semaphore, target,
+                                                                       port_scan_profiles, port_scan_profile,
+                                                                       service_scans_profiles,
+                                                                       global_patterns, nmapextra)))
         elapsed_time = calculate_elapsed_time(start_time)
         info('Finished scanning target {byellow}{target.address}{rst} in {elapsed_time}')
         return results
@@ -1501,14 +1513,17 @@ def dbcreateServicesTbl():
 
 
 #####################################################################################################################
-def detect_live_hosts(targetRange):
-    # scans
+def detect_live_hosts(targetRange, concurrent_scans, concurrent_targets, live_host_scan_profiles,
+                      live_host_scan_profile, global_patterns, nmapextra):
+
     with ProcessPoolExecutor(max_workers=concurrent_targets) as executor:
         start_time = time.time()
         futures = []
 
         target = Target(targetRange)
-        future = executor.submit(scan_live_hosts, target, concurrent_scans)
+
+        future = executor.submit(scan_live_hosts, target, concurrent_scans, live_host_scan_profiles,
+                                 live_host_scan_profile, global_patterns, nmapextra)
 
         live_hosts = []
         try:
@@ -1541,61 +1556,86 @@ def findProfile(profileName, configList):
 
                 if 'service-detection' not in configList[profile][scan]:
                     error(
-                        'The {profile}.{scan} scan does not have a defined service-detection section. Every scan must at least have a service-detection section defined with a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, service and version from the result.')
+                        'The {profile}.{scan} scan does not have a defined service-detection section. '
+                        'Every scan must at least have a service-detection section defined with a command and a '
+                        'corresponding pattern that extracts the protocol (TCP/UDP), port, service and version '
+                        'from the result.')
                     errors = True
                 else:
                     if 'command' not in configList[profile][scan]['service-detection']:
                         error(
-                            'The {profile}.{scan}.service-detection section does not have a command defined. Every service-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, service and version from the results.')
+                            'The {profile}.{scan}.service-detection section does not have a command defined. '
+                            'Every service-detection section must have a command and a corresponding pattern '
+                            'that extracts the protocol (TCP/UDP), port, service and version from the results.')
                         errors = True
                     else:
-                        if '{ports}' in configList[profile][scan]['service-detection']['command'] and 'port-scan' not in \
+                        if '{ports}' in configList[profile][scan]['service-detection']['command'] \
+                                and 'port-scan' not in \
                                 configList[profile][scan]:
                             error(
-                                'The {profile}.{scan}.service-detection command appears to reference a port list but there is no port-scan section defined in {profile}.{scan}. Define a port-scan section with a command and corresponding pattern that extracts port numbers from the result, or replace the reference with a static list of ports.')
+                                'The {profile}.{scan}.service-detection command appears to reference a port list '
+                                'but there is no port-scan section defined in {profile}.{scan}. Define a port-scan '
+                                'section with a command and corresponding pattern that extracts port numbers from the '
+                                'result, or replace the reference with a static list of ports.')
                             errors = True
 
                     if 'pattern' not in configList[profile][scan]['service-detection']:
                         error(
-                            'The {profile}.{scan}.service-detection section does not have a pattern defined. Every service-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, service and version from the results.')
+                            'The {profile}.{scan}.service-detection section does not have a pattern defined. '
+                            'Every service-detection section must have a command and a corresponding pattern '
+                            'that extracts the protocol (TCP/UDP), port, service and version from the results.')
                         errors = True
                     else:
                         if not all(x in configList[profile][scan]['service-detection']['pattern'] for x in
                                    ['(?P<port>', '(?P<protocol>', '(?P<service>']):
                             error(
-                                'The {profile}.{scan}.service-detection pattern does not contain one or more of the following matching groups: port, protocol, service. Ensure that all three of these matching groups are defined and capture the relevant data, e.g. (?P<port>\d+)')
+                                'The {profile}.{scan}.service-detection pattern does not contain one or more of '
+                                'the following matching groups: port, protocol, service. Ensure that all three of '
+                                'these matching groups are defined and capture the relevant data, e.g. (?P<port>\d+)')
                             errors = True
 
                 if 'port-scan' in configList[profile][scan]:
                     if 'command' not in configList[profile][scan]['port-scan']:
                         error(
-                            'The {profile}.{scan}.port-scan section does not have a command defined. Every port-scan section must have a command and a corresponding pattern that extracts the port from the results.')
+                            'The {profile}.{scan}.port-scan section does not have a command defined. '
+                            'Every port-scan section must have a command and a corresponding pattern that '
+                            'extracts the port from the results.')
                         errors = True
 
                     if 'pattern' not in configList[profile][scan]['port-scan']:
                         error(
-                            'The {profile}.{scan}.port-scan section does not have a pattern defined. Every port-scan section must have a command and a corresponding pattern that extracts the port from the results.')
+                            'The {profile}.{scan}.port-scan section does not have a pattern defined. '
+                            'Every port-scan section must have a command and a corresponding pattern that '
+                            'extracts the port from the results.')
                         errors = True
                     else:
                         if '(?P<port>' not in configList[profile][scan]['port-scan']['pattern']:
                             error(
-                                'The {profile}.{scan}.port-scan pattern does not contain a port matching group. Ensure that the port matching group is defined and captures the relevant data, e.g. (?P<port>\d+)')
+                                'The {profile}.{scan}.port-scan pattern does not contain a port matching group. '
+                                'Ensure that the port matching group is defined and captures the relevant '
+                                'data, e.g. (?P<port>\d+)')
                             errors = True
 
                 if 'live-host-detection' in configList[profile][scan]:
                     if 'command' not in configList[profile][scan]['live-host-detection']:
                         error(
-                            'The {profile}.{scan}.live-host-detection section does not have a command defined. Every live-host-detection section must have a command and a corresponding pattern that extracts the live host from the results.')
+                            'The {profile}.{scan}.live-host-detection section does not have a command defined. '
+                            'Every live-host-detection section must have a command and a corresponding pattern '
+                            'that extracts the live host from the results.')
                         errors = True
 
                     if 'pattern' not in configList[profile][scan]['live-host-detection']:
                         error(
-                            'The {profile}.{scan}.plive-host-detection section does not have a pattern defined. Every live-host-detection section must have a command and a corresponding pattern that extracts the live host from the results.')
+                            'The {profile}.{scan}.plive-host-detection section does not have a pattern defined. '
+                            'Every live-host-detection section must have a command and a corresponding pattern '
+                            'that extracts the live host from the results.')
                         errors = True
                     else:
                         if '(?P<port>' not in configList[profile][scan]['live-host-detection']['pattern']:
                             error(
-                                'The {profile}.{scan}.live-host-detection pattern does not contain a port matching group. Ensure that the port matching group is defined and captures the relevant data, e.g. (?P<port>\d+)')
+                                'The {profile}.{scan}.live-host-detection pattern does not contain a port '
+                                'matching group. Ensure that the port matching group is defined and captures '
+                                'the relevant data, e.g. (?P<port>\d+)')
                             errors = True
 
             break
@@ -1617,29 +1657,42 @@ def findLiveHostProfile(profileName, configList):
 
                 if 'live-host-detection' not in configList[profile][scan]:
                     error(
-                        'The {profile}.{scan} scan does not have a defined live-host-detection section. Every scan must at least have a live-host-detection section defined with a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, service and version from the result.')
+                        'The {profile}.{scan} scan does not have a defined live-host-detection section. '
+                        'Every scan must at least have a live-host-detection section defined with a command '
+                        'and a corresponding pattern that extracts the protocol (TCP/UDP), port, service and '
+                        'version from the result.')
                     errors = True
                 else:
                     if 'command' not in configList[profile][scan]['live-host-detection']:
                         error(
-                            'The {profile}.{scan}.live-host-detection section does not have a command defined. Every live-host-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, service and version from the results.')
+                            'The {profile}.{scan}.live-host-detection section does not have a command defined. '
+                            'Every live-host-detection section must have a command and a corresponding pattern '
+                            'that extracts the protocol (TCP/UDP), port, service and version from the results.')
                         errors = True
                     else:
-                        if '{ports}' in configList[profile][scan]['live-host-detection'][
-                            'command'] and 'port-scan' not in configList[profile][scan]:
+                        if '{ports}' in configList[profile][scan]['live-host-detection']['command'] \
+                                and 'port-scan' not in configList[profile][scan]:
                             error(
-                                'The {profile}.{scan}.live-host-detection command appears to reference a port list but there is no port-scan section defined in {profile}.{scan}. Define a port-scan section with a command and corresponding pattern that extracts port numbers from the result, or replace the reference with a static list of ports.')
+                                'The {profile}.{scan}.live-host-detection command appears to reference a '
+                                'port list but there is no port-scan section defined in {profile}.{scan}. '
+                                'Define a port-scan section with a command and corresponding pattern that '
+                                'extracts port numbers from the result, or replace the reference with a '
+                                'static list of ports.')
                             errors = True
 
                     if 'pattern' not in configList[profile][scan]['live-host-detection']:
                         error(
-                            'The {profile}.{scan}.live-host-detection section does not have a pattern defined. Every live-host-detection section must have a command and a corresponding pattern that extracts the protocol (TCP/UDP), port, service and version from the results.')
+                            'The {profile}.{scan}.live-host-detection section does not have a pattern defined. '
+                            'Every live-host-detection section must have a command and a corresponding pattern '
+                            'that extracts the protocol (TCP/UDP), port, service and version from the results.')
                         errors = True
                     else:
                         if not all(x in configList[profile][scan]['live-host-detection']['pattern'] for x in
                                    ['(?P<address>']):
                             error(
-                                'The {profile}.{scan}.live-host-detection pattern does not contain one or more of the following matching groups: address. Ensure that all three of these matching groups are defined and capture the relevant data, e.g. (?P<port>\d+)')
+                                'The {profile}.{scan}.live-host-detection pattern does not contain one or '
+                                'more of the following matching groups: address. Ensure that all three of '
+                                'these matching groups are defined and capture the relevant data, e.g. (?P<port>\d+)')
                             errors = True
             break
 
@@ -1663,16 +1716,49 @@ def html(mdfile, htmlfile):
 
 #####################################################################################################################
 
-def checktoolsexistence():
-    for tool in tools:
-        exists = shutil.which(tool)
-        if exists is None:
-            error('The {tool} tool is missing. Please install it (e.g. \'sudo apt install {tool}\').')
+def query_yes_no(question, default="no"):
+    valid = {"yes": True, "y": True, "ye": True, "no": False, "n": False}
+    if default is None:
+        prompt = " [y/n] "
+    elif default == "yes":
+        prompt = " [Y/n] "
+    elif default == "no":
+        prompt = " [y/N] "
+    else:
+        raise ValueError("invalid default answer: '%s'" % default)
+
+    while True:
+        sys.stdout.write(question + prompt)
+        choice = input().lower()
+        if default is not None and choice == '':
+            return valid[default]
+        elif choice in valid:
+            return valid[choice]
+        else:
+            sys.stdout.write("Please respond with 'yes' or 'no' "
+                             "(or 'y' or 'n').\n")
 
 
 #####################################################################################################################
 
-def analyzetargets(raw_targets):
+def checktoolsexistence():
+    toolsmissing = False
+    for tool in tools:
+        exists = shutil.which(tool)
+        if exists is None:
+            toolsmissing = True
+            error('The {tool} tool is missing. Please install it (e.g. \'sudo apt install {tool}\').')
+
+    if toolsmissing:
+        question('Some tools are missing from your system. ')
+        if not query_yes_no('Would you like to continue?'):
+            sys.exit(0)
+
+
+#####################################################################################################################
+
+def analyzetargets(raw_targets, concurrent_scans, concurrent_targets, live_host_scan_profiles, live_host_scan_profile,
+                   global_patterns, nmapextra):
     targets = []
     patterns = []
     err = False
@@ -1689,7 +1775,8 @@ def analyzetargets(raw_targets):
             try:
                 # ip range(CIDR) e.g. 192.168.1.0/24
                 target_range = ipaddress.ip_network(t, strict=False)
-                dlh = detect_live_hosts(t)
+                dlh = detect_live_hosts(t, concurrent_scans, concurrent_targets, live_host_scan_profiles,
+                                        live_host_scan_profile, global_patterns, nmapextra)
                 live_hosts = dlh[0]
                 matchedpatterns = dlh[1]
                 patterns += matchedpatterns
@@ -1717,10 +1804,10 @@ def analyzetargets(raw_targets):
 
 #####################################################################################################################
 
-def parseargs(psp_config: [], psp_config_file: string, lhsp_config: [], lhsp_config_file: string):
-    ProgramArgs = namedtuple('ProgramArgs', 'concurrent_scans concurrent_targets errors heartbeat livehost_profile '
-                                            'nmap_args patterns portscan_profile project_name speed target_file '
-                                            'targets verbose working_dir')
+def parseargs(psps: [], psp_config_file: string, lhsps: [], lhsp_config_file: string):
+    ProgramArgs = namedtuple('ProgramArgs', 'concurrent_scans concurrent_targets exclude errors heartbeat '
+                                            'livehost_profile nmap_args portscan_profile project_name '
+                                            'raw_targets speed target_file verbose working_dir')
 
     err = False
 
@@ -1781,7 +1868,7 @@ def parseargs(psp_config: [], psp_config_file: string, lhsp_config: [], lhsp_con
         err = True
 
     psp = args.profile_name
-    found_scan_profile = findProfile(psp, psp_config)
+    found_scan_profile = findProfile(psp, psps)
 
     if not found_scan_profile:
         error(
@@ -1790,7 +1877,7 @@ def parseargs(psp_config: [], psp_config_file: string, lhsp_config: [], lhsp_con
         err = True
 
     lhsp = args.livehost_profile_name
-    found_live_host_scan_profile = findLiveHostProfile(lhsp, lhsp_config)
+    found_live_host_scan_profile = findLiveHostProfile(lhsp, lhsps)
 
     if not found_live_host_scan_profile:
         error(
@@ -1803,6 +1890,10 @@ def parseargs(psp_config: [], psp_config_file: string, lhsp_config: [], lhsp_con
         nmap_args = "--exclude {}".format(args.exclude)
 
     raw_targets = args.targets
+
+    if len(raw_targets) == 0:
+        error('You must specify at least one target to scan!')
+        err = True
 
     if len(args.target_file) > 0:
 
@@ -1823,13 +1914,13 @@ def parseargs(psp_config: [], psp_config_file: string, lhsp_config: [], lhsp_con
             error('The target file {args.target_file} could not be read.')
             sys.exit(1)
 
-    targs, patt, err = analyzetargets(raw_targets)
-
     myargs = ProgramArgs(concurrent_scans=args.concurrent_scans, concurrent_targets=args.concurrent_targets,
-                         errors=err, heartbeat=args.heartbeat, livehost_profile=found_live_host_scan_profile,
-                         nmap_args=nmap_args, patterns=patt, portscan_profile=found_scan_profile,
-                         project_name=args.project_name, speed=args.speed, target_file=args.target_file,
-                         targets=targs, verbose=args.verbose, working_dir=args.working_dir)
+                         exclude=args.exclude, errors=err, heartbeat=args.heartbeat,
+                         livehost_profile=lhsp, nmap_args=nmap_args,
+                         portscan_profile=psp, project_name=args.project_name,
+                         raw_targets=raw_targets, speed=args.speed,
+                         target_file=args.target_file, verbose=args.verbose,
+                         working_dir=args.working_dir)
 
     return myargs
 
@@ -1843,36 +1934,42 @@ if __name__ == '__main__':
 
     checktoolsexistence()
 
-    intelArgs = parseargs(port_scan_profiles, port_scan_profiles_file, live_host_scan_profiles, live_host_scan_profiles_file)
+    port_scan_profiles_file = 'port-scan-profiles.toml'
+    live_host_scan_profiles_file = 'live-host-scan-profiles.toml'
+
+    lhsps, psps, ssps, gp, uw, pw = loadprofiles(live_host_scan_profiles_file, port_scan_profiles_file)
+
+    intelArgs = parseargs(psps, port_scan_profiles_file, lhsps, live_host_scan_profiles_file)
+
+    if intelArgs.errors:
+        sys.exit(1)
 
     if not isroot():
         sys.exit(1)
 
     warn('Running with root privileges.')
 
-    if intelArgs.errors:
-        sys.exit(1)
-
-    Matched_Patterns_Report = intelArgs.patterns
-
-    if len(intelArgs.targets) == 0:
-        error('You must specify at least one target to scan!')
-        errors = True
-
-    srvname = ''
-
     createProjectDirStructure(intelArgs.project_name, intelArgs.working_dir)
 
     dbconnect()
 
-    info('Concurrent targets {concurrent_targets}')
-    info('Concurrent scans {concurrent_scans}')
+    info('Concurrent targets {intelArgs.concurrent_targets}')
+    info('Concurrent scans {intelArgs.concurrent_scans}')
     info("Excluding from scans: {0}.".format(intelArgs.exclude))
+
+    targs, patt, aterr = analyzetargets(intelArgs.raw_targets, intelArgs.concurrent_scans,
+                                        intelArgs.concurrent_targets, lhsps,
+                                        intelArgs.livehost_profile, gp, intelArgs.nmap_args)
+
+    if aterr:
+        sys.exit(1)
+
+    Matched_Patterns_Report = patt
 
     with open(FinalReportMDFile, 'w') as file:
         file.write("# Final Report\n\n")
         file.write("## Target/s\n\n")
-        for target in intelArgs.targets:
+        for target in targs:
             dbaddTarget(target)
             file.write("* {0}\n".format(target))
 
@@ -1880,12 +1977,14 @@ if __name__ == '__main__':
         file.write("## Services\n\n")
 
     with ProcessPoolExecutor(max_workers=intelArgs.concurrent_targets) as executor:
-        start_time = time.time()
+        st = time.time()
         futures = []
 
-        for address in intelArgs.targets:
+        for address in targs:
             target = Target(address)
-            futures.append(executor.submit(scan_host, target, concurrent_scans))
+            futures.append(executor.submit(scan_host, target, intelArgs.concurrent_scans,
+                                           psps, intelArgs.portscan_profile, ssps, gp,
+                                           intelArgs.nmap_args))
 
         try:
             with open(FinalReportMDFile, 'a') as file:
@@ -1894,7 +1993,7 @@ if __name__ == '__main__':
                 for future in as_completed(futures):
                     if future.result():
 
-                        # print(future.result())
+
                         data = future.result()[0][0]
                         matched_patterns = future.result()[0][1]
                         Matched_Patterns_Report += matched_patterns
@@ -1926,7 +2025,7 @@ if __name__ == '__main__':
                 udpPortscommalist = ','.join(str(s) for s in uniqueUdpPorts)
 
                 file.write("## Hosts & Ports\n")
-                file.write("\n* **{0}**\n".format(','.join(intelArgs.targets)))
+                file.write("\n* **{0}**\n".format(','.join(targs)))
                 file.write("\n* TCP: **{0}**\n".format(tcpPortscommalist))
                 file.write("\n* UDP: **{0}**\n".format(udpPortscommalist))
                 file.write("\n---\n\n")
@@ -1937,7 +2036,7 @@ if __name__ == '__main__':
             executor.shutdown(wait=False)
             sys.exit(1)
 
-        elapsed_time = calculate_elapsed_time(start_time)
+        elapsed_time = calculate_elapsed_time(st)
         info('{bgreen}Finished scanning all targets in {elapsed_time}!{rst}')
 
     with open(FinalReportMDFile, 'a') as file:
@@ -1949,5 +2048,5 @@ if __name__ == '__main__':
     html(FinalReportMDFile, FinalReportHTMLFile)
 
     dbdisconnect()
-    elapsed_time = calculate_elapsed_time(start_time)
+    elapsed_time = calculate_elapsed_time(st)
     info('{bgreen}IntelSpy completed in {elapsed_time}!{rst}')
