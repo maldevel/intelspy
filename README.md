@@ -52,7 +52,7 @@ The tool will also launch further enumeration scans for each detected service us
 * svwar (*prerequisite*) (``` sudo apt install sipvicious ```)
 * tnscmd10g (*prerequisite*) (``` sudo apt install tnscmd10g ```)
 * whatweb (*prerequisite*) (``` sudo apt install whatweb ```)
-* wkhtmltoimage (*prerequisite*) (https://github.com/wkhtmltopdf/wkhtmltopdf/)
+* wkhtmltoimage (*prerequisite*) (https://github.com/wkhtmltopdf/wkhtmltopdf/) (``` sudo apt install wkhtmltopdf ```)
 * wpscan (*optional*) (``` sudo apt install wpscan ```)
 
 
