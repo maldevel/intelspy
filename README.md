@@ -43,7 +43,7 @@ The tool will also launch further enumeration scans for each detected service us
 * oscanner (*optional*) (``` sudo apt install oscanner ```)
 * pandoc (*prerequisite*) (``` sudo apt install pandoc ```)
 * patator (*optional*) (``` sudo apt install patator ```)
-* showmount (*prerequisite*) ('system tool ')
+* showmount (*prerequisite*) ('system tool ')(``` sudo apt install nfs-common ```)
 * smbclient (*prerequisite*) (``` sudo apt install smbclient ```)
 * smbmap (*prerequisite*) (``` sudo apt install smbmap ```)
 * smtp-user-enum (*prerequisite*) (``` sudo apt install smtp-user-enum ```)
