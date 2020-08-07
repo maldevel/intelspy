@@ -43,7 +43,7 @@ The tool will also launch further enumeration scans for each detected service us
 * oscanner (*optional*) (``` sudo apt install oscanner ```)
 * pandoc (*prerequisite*) (``` sudo apt install pandoc ```)
 * patator (*optional*) (``` sudo apt install patator ```)
-* showmount (*prerequisite*) ('system tool ')
+* showmount (*prerequisite*) (``` sudo apt install nfs-common ```)
 * smbclient (*prerequisite*) (``` sudo apt install smbclient ```)
 * smbmap (*prerequisite*) (``` sudo apt install smbmap ```)
 * smtp-user-enum (*prerequisite*) (``` sudo apt install smtp-user-enum ```)
@@ -52,7 +52,7 @@ The tool will also launch further enumeration scans for each detected service us
 * svwar (*prerequisite*) (``` sudo apt install sipvicious ```)
 * tnscmd10g (*prerequisite*) (``` sudo apt install tnscmd10g ```)
 * whatweb (*prerequisite*) (``` sudo apt install whatweb ```)
-* wkhtmltoimage (*prerequisite*) (https://github.com/wkhtmltopdf/wkhtmltopdf/)
+* wkhtmltoimage (*prerequisite*) (``` sudo apt install wkhtmltopdf ```)
 * wpscan (*optional*) (``` sudo apt install wpscan ```)
 
 
