@@ -65,3 +65,15 @@
         [quick.nmap-top-3000-udp.service-detection]
         command = 'nmap {nmap_extra} -sU -vv -A -Pn --defeat-icmp-ratelimit --osscan-guess --version-all -p{ports} -T{nmap_speed} -oA "{udpservicesdir}/{address}_nmap_top_3000_udp_services" {address}'
         pattern = '^(?P<port>\d+)\/(?P<protocol>(tcp|udp))(.*)open(\s*)(?P<service>[\w\-\/\?]+)(\s*)(?P<reason>[\w\-]+)(\s*)ttl(\s*)\d+(\s*)(?P<version>.*)$'
+
+[web]
+
+    [web.nmap-tcp]
+
+        [web.nmap-tcp.port-scan]
+        command = 'nmap {nmap_extra} -sS -vv -n -Pn -p80,443 --open -T{nmap_speed} -oA "{fulltcpportsdir}/{address}_nmap_web_tcp" {address}'
+        pattern = '^(?P<port>\d+)\/(?P<protocol>(tcp|udp))(.*)open(\s*)(?P<service>[\w\-\/\?]+)(\s*)(?P<reason>[\w\-]+)(\s*)ttl(\s*)\d+(\s*)(?P<version>.*)$'
+
+        [web.nmap-tcp.service-detection]
+        command = 'nmap {nmap_extra} -sS -vv -A -Pn --osscan-guess --version-all -p{ports} -T{nmap_speed} -oA "{tcpservicesdir}/{address}_nmap_web_tcp_services" {address}'
+        pattern = '^(?P<port>\d+)\/(?P<protocol>(tcp|udp))(.*)open(\s*)(?P<service>[\w\-\/\?]+)(\s*)(?P<reason>[\w\-]+)(\s*)ttl(\s*)\d+(\s*)(?P<version>.*)$'

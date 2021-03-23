@@ -93,7 +93,7 @@ TERM_FLAGS = termios.tcgetattr(sys.stdin.fileno())
 verbose = 0
 speed = 4
 # nmap = '-vv --reason -Pn'
-nmap=''
+nmap = ''
 heartbeat_interval = 60
 
 RootDir = os.path.dirname(os.path.realpath(__file__))
@@ -252,7 +252,6 @@ def calculate_elapsed_time(start_time):
 #####################################################################################################################
 
 def loadprofiles(live_host_scan_profiles_file, port_scan_profiles_file):
-
     with open(os.path.join(RootDir, 'profiles', live_host_scan_profiles_file), 'r') as p:
         try:
             live_host_scan_profiles = toml.load(p)
@@ -455,7 +454,6 @@ async def run_cmd(semaphore, cmd, target, global_patterns, tag='?', patterns=[])
                     e('{timestp} Task {tag} returned non-zero exit code: {process.returncode}. Command: {cmd}\n'))
     else:
         info('Task {bgreen}{tag}{rst} on {byellow}{address}{rst} finished successfully in {elapsed_time}')
-
 
     if results[0]:
         matched_patterns = results[0]
@@ -1040,7 +1038,8 @@ async def scan_services(loop, semaphore, target, port_scan_profiles, port_scan_p
 
                         secure = True if 'ssl' in service or 'tls' in service else False
 
-                        # Special cases for HTTP.
+                        # print('service'+service)
+                        # Special cases for HTTP. used in toml file
                         scheme = 'https' if 'https' in service or 'ssl' in service or 'tls' in service else 'http'
 
                         if service.startswith('ssl/') or service.startswith('tls/'):
@@ -1246,7 +1245,6 @@ def scan_live_hosts(target, concurrent_scans, live_host_scan_profiles, live_host
 #####################################################################################################################
 def scan_host(target, concurrent_scans, port_scan_profiles, port_scan_profile, service_scans_profiles,
               global_patterns, nmapextra):
-
     start_time = time.time()
     info('Scanning target {byellow}{target.address}{rst}')
 
@@ -1515,7 +1513,6 @@ def dbcreateServicesTbl():
 #####################################################################################################################
 def detect_live_hosts(targetRange, concurrent_scans, concurrent_targets, live_host_scan_profiles,
                       live_host_scan_profile, global_patterns, nmapextra):
-
     with ProcessPoolExecutor(max_workers=concurrent_targets) as executor:
         start_time = time.time()
         futures = []
@@ -1892,27 +1889,29 @@ def parseargs(psps: [], psp_config_file: string, lhsps: [], lhsp_config_file: st
     raw_targets = args.targets
 
     if len(raw_targets) == 0:
-        error('You must specify at least one target to scan!')
-        err = True
+        # error('You must specify at least one target to scan!')
+        # err = True
+        if len(args.target_file) > 0:
+            if not os.path.isfile(args.target_file):
+                error('The target file {args.target_file} was not found.')
+                sys.exit(1)
 
-    if len(args.target_file) > 0:
+            try:
+                with open(args.target_file, 'r') as f:
+                    lines = f.read()
+                    for line in lines.splitlines():
+                        line = line.strip()
+                        if line.startswith('#') or len(line) == 0: continue
+                        if line not in raw_targets:
+                            raw_targets.append(line)
 
-        if not os.path.isfile(args.target_file):
-            error('The target file {args.target_file} was not found.')
-            sys.exit(1)
+            except OSError:
+                error('The target file {args.target_file} could not be read.')
+                sys.exit(1)
 
-        try:
-            with open(args.target_file, 'r') as f:
-                lines = f.read()
-                for line in lines.splitlines():
-                    line = line.strip()
-                    if line.startswith('#') or len(line) == 0: continue
-                    if line not in raw_targets:
-                        raw_targets.append(line)
-
-        except OSError:
-            error('The target file {args.target_file} could not be read.')
-            sys.exit(1)
+        else:
+            error('You must specify at least one target to scan!')
+            err = True
 
     myargs = ProgramArgs(concurrent_scans=args.concurrent_scans, concurrent_targets=args.concurrent_targets,
                          exclude=args.exclude, errors=err, heartbeat=args.heartbeat,
@@ -1932,8 +1931,6 @@ if __name__ == '__main__':
     print(message)
     start_time = time.time()
 
-    checktoolsexistence()
-
     port_scan_profiles_file = 'port-scan-profiles.toml'
     live_host_scan_profiles_file = 'live-host-scan-profiles.toml'
 
@@ -1948,6 +1945,8 @@ if __name__ == '__main__':
 
     if not isroot():
         sys.exit(1)
+
+    checktoolsexistence()
 
     warn('Running with root privileges.')
 
@@ -1994,7 +1993,6 @@ if __name__ == '__main__':
                 udpports = []
                 for future in as_completed(futures):
                     if future.result():
-
 
                         data = future.result()[0][0]
                         matched_patterns = future.result()[0][1]
