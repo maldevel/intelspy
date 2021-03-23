@@ -380,7 +380,7 @@ async def read_stream(stream, target, global_patterns, tag='?', patterns=[], col
                                       'a') as file:
                                 log_line = e('{tag} - {target.address} - {match}\n\n')
                                 file.writelines(log_line)
-                                imp = e('{target.address} - ' + p['description'] + '\n\n').strip()
+                                mp = e('{target.address} - ' + p['description'] + '\n\n').strip()
                                 if mp not in matched_patterns:
                                     matched_patterns.append(mp)
 
